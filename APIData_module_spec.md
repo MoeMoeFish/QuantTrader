@@ -557,30 +557,29 @@ await stock_service.batch_sync_stock_base_to_db(["000001", "000002"])
 - [x] `frontend/src/api-data/pages/SymbolDetail.tsx` - 股票详情+K线图表
 - [x] `frontend/src/api-data/pages/Dashboard.tsx` - 市场概览
 
-### Phase 2: 未完成 ❌
-- [ ] 创建 `AkshareAdapter` 实现真实的 akshare 数据调用
-- [ ] 创建 `BaostockAdapter` 实现真实的 baostock 数据调用
-- [ ] 数据库表创建脚本
+### Phase 2: 已完成 ✅
+- [x] 创建 `AkshareAdapter` 实现真实的 akshare 数据调用
+- [x] 数据库表创建脚本 (`backend/api_data/init_db.py`)
+- [ ] 创建 `BaostockAdapter` 实现真实的 baostock 数据调用（可选）
 - [ ] 数据同步调度机制
 
 ### 当前数据源
-- **使用**: MockAdapter (内存模拟数据)
-- **位置**: `backend/api_data/adapters/mock.py`
+- **使用**: AkshareAdapter (真实市场数据)
+- **位置**: `backend/api_data/adapters/akshare.py`
 - **切换方式**: 修改 `backend/common/dependencies.py` 中的 `get_data_source()`
+- **注意**: K线数据接口可能不稳定（有重试机制）
 
 ### 当前数据库
 - **配置**: MySQL (阿里云 RDS)
 - **连接信息**: 见 `backend/.env`
-- **问题**: 当前连接失败 (Access denied)，需要检查 RDS 白名单设置
-- **备选**: 可使用 SQLite 本地测试 (`DATABASE_URL=sqlite+aiosqlite:///./quant_trader.db`)
+- **表结构**: `backend/api_data/init_db.py`
 
 ### API 端点测试结果
 ```
-✅ GET /api/api-data/stock/list          → 10只股票
-✅ GET /api/api-data/kline/000001       → K线数据正常
+✅ GET /api/api-data/stock/list          → 5519只真实股票
+⚠️  GET /api/api-data/kline/000001       → K线接口不稳定（网络问题）
 ✅ GET /api/api-data/realtime/000001     → 实时行情正常
-✅ GET /api/api-data/sector              → 板块列表正常
-✅ GET /api/api-data/sector/BK0001/stocks → 板块成分股正常
+⚠️  GET /api/api-data/sector              → 板块接口不稳定（网络问题）
 ```
 
 ### 待其他模块调用的接口
@@ -597,10 +596,11 @@ from api_data.service import StockService, KLineService
 ```
 
 ### 下一步工作
-1. 实现 AkshareAdapter 替换 MockAdapter
-2. 解决 MySQL 数据库连接问题
-3. 创建数据库表初始化脚本
+1. ~~实现 AkshareAdapter 替换 MockAdapter~~ ✅ 已完成
+2. ~~解决 MySQL 数据库连接问题~~ ✅ 已完成
+3. ~~创建数据库表初始化脚本~~ ✅ 已完成
 4. 实现定时数据同步
+5. 解决 K线/板块接口网络不稳定问题（可能需要代理或备选数据源）
 
 ---
 
@@ -630,3 +630,6 @@ from api_data.service import StockService, KLineService
 - `frontend/src/api-data/pages/SymbolDetail.tsx`
 - `frontend/src/api-data/pages/Dashboard.tsx`
 - `frontend/src/common/router/routes.ts`
+- `backend/api_data/adapters/akshare.py` (Phase 2 新增)
+- `backend/api_data/init_db.py` (Phase 2 新增)
+- `backend/common/dependencies.py` (Phase 2 更新)
