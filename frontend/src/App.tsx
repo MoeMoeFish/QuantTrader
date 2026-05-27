@@ -6,6 +6,7 @@ import {
   SymbolDetailPage,
   AccountManagementPage,
   TradingDeskPage,
+  OrderQueryPage,
   StrategiesPage,
   StrategyEditorPage,
   ExecutionPage,
@@ -32,7 +33,7 @@ export default function App() {
           <Route path="/account" element={<AccountManagementPage />} />
           <Route path="/account/manage" element={<AccountManagementPage />} />
           <Route path="/account/trading" element={<TradingDeskPage />} />
-          <Route path="/account/orders" element={<TradingDeskPage />} />
+          <Route path="/account/orders" element={<OrderQueryPage />} />
           <Route path="/strategies" element={<StrategiesPage />} />
           <Route path="/strategy-editor" element={<StrategyEditorPage />} />
           <Route path="/execution" element={<ExecutionPage />} />

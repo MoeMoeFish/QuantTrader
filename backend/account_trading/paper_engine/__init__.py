@@ -1,5 +1,5 @@
 from .engine import PaperTradingEngine
-from .market_data import MarketDataProvider, MockMarketDataProvider
+from .market_data import MarketDataProvider, MockMarketDataProvider, TencentMarketDataProvider
 from .schemas import (
     FeeRule,
     MatchDecision,
@@ -14,6 +14,7 @@ __all__ = [
     "MarketDataProvider",
     "MatchDecision",
     "MockMarketDataProvider",
+    "TencentMarketDataProvider",
     "OrderBookLevel",
     "PaperOrderRequest",
     "PaperTradingEngine",

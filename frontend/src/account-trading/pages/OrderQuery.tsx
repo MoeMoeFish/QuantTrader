@@ -82,7 +82,6 @@ export default function OrderQuery() {
 
   useEffect(() => {
     void refreshAccounts()
-    void refreshOrders()
     void refreshLogs(false)
   }, [])
 
@@ -111,16 +110,18 @@ export default function OrderQuery() {
       const activeAccounts = data.filter((account) => account.status !== 'archived')
       setAccounts(activeAccounts)
       const defaultAccount = activeAccounts.find((account) => account.is_default)
-      setSelectedAccountId((current) => current || defaultAccount?.id || activeAccounts[0]?.id || null)
+      const nextAccountId = selectedAccountId || defaultAccount?.id || activeAccounts[0]?.id || null
+      setSelectedAccountId(nextAccountId)
+      if (nextAccountId) await refreshOrders(scope, nextAccountId)
     }
   }
 
-  async function refreshOrders(nextScope = scope) {
+  async function refreshOrders(nextScope = scope, accountId = selectedAccountId) {
     const data = await callApi<OrderRow[]>('orders', () =>
       request.get('/account/orders', {
         params: {
           scope: nextScope,
-          account_id: selectedAccountId || undefined,
+          account_id: accountId || undefined,
           wait_manual_captcha: waitCaptcha,
           manual_captcha_timeout: 180,
         },
@@ -130,12 +131,12 @@ export default function OrderQuery() {
     if (data) setOrders(data)
   }
 
-  async function refreshTrades(nextScope = scope) {
+  async function refreshTrades(nextScope = scope, accountId = selectedAccountId) {
     const data = await callApi<TradeRow[]>('trades', () =>
       request.get('/account/trades', {
         params: {
           scope: nextScope,
-          account_id: selectedAccountId || undefined,
+          account_id: accountId || undefined,
           wait_manual_captcha: waitCaptcha,
           manual_captcha_timeout: 180,
         },
@@ -172,12 +173,17 @@ export default function OrderQuery() {
     if (activeTab === 'trades') await refreshTrades(nextScope)
   }
 
-  function switchAccount(value: string) {
-    setSelectedAccountId(value ? Number(value) : null)
+  async function switchAccount(value: string) {
+    const nextAccountId = value ? Number(value) : null
+    setSelectedAccountId(nextAccountId)
     setOrders([])
     setTrades([])
     setMessage('')
     setError('')
+    if (nextAccountId) {
+      if (activeTab === 'orders') await refreshOrders(scope, nextAccountId)
+      if (activeTab === 'trades') await refreshTrades(scope, nextAccountId)
+    }
   }
 
   return (
@@ -191,7 +197,7 @@ export default function OrderQuery() {
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={selectedAccountId ?? ''}
-              onChange={(event) => switchAccount(event.target.value)}
+              onChange={(event) => void switchAccount(event.target.value)}
               className={`${inputClass} min-w-[260px]`}
             >
               <option value="">跟随同花顺当前账户</option>
@@ -255,7 +261,7 @@ function TabButton({ active, label, onClick }: { active: boolean; label: string;
 }
 
 function OrdersTable({ rows }: { rows: OrderRow[] }) {
-  return <DataTable empty="暂无委托记录" headers={['合同编号', '代码', '名称', '方向', '价格', '数量', '成交', '状态', '时间']} rows={rows.map((row) => [row.broker_order_id || row.order_id, row.symbol, row.name, <SideText side={row.side} />, money(row.price), numberText(row.quantity), numberText(row.filled_quantity), row.status || '-', row.submitted_at || '-'])} />
+  return <DataTable empty="暂无委托记录" headers={['合同编号', '代码', '名称', '方向', '价格', '数量', '成交', '状态', '时间']} rows={rows.map((row) => [row.broker_order_id || row.order_id, row.symbol, row.name, <SideText side={row.side} />, money(row.price), numberText(row.quantity), numberText(row.filled_quantity), orderStatusLabel(row.status), row.submitted_at || '-'])} />
 }
 
 function TradesTable({ rows }: { rows: TradeRow[] }) {
@@ -292,4 +298,19 @@ function accountTypeLabel(value: string) {
   if (value === 'paper') return '模拟盘'
   if (value === 'backtest') return '回测盘'
   return value || '-'
+}
+
+function orderStatusLabel(status: string) {
+  const value = String(status || 'submitted').toLowerCase()
+  if (['已提交未成交', '未成交', '已报', 'submitted', 'created', 'accepted'].some((item) => value.includes(item.toLowerCase()))) return '已提交未成交'
+  if (['部分成交', '部成', 'partial_filled'].some((item) => value.includes(item.toLowerCase()))) return '部分成交'
+  if (['全部成交', '已成', 'filled'].some((item) => value.includes(item.toLowerCase()))) return '全部成交'
+  if (['部分撤单', '部撤', 'partial_canceled'].some((item) => value.includes(item.toLowerCase()))) return '部分撤单'
+  if (['全部撤单', '已撤', 'canceled', 'cancelled'].some((item) => value.includes(item.toLowerCase()))) return '全部撤单'
+  if (['撤单中', 'cancel_pending'].some((item) => value.includes(item.toLowerCase()))) return '撤单中'
+  if (['部分失效', 'partial_expired'].some((item) => value.includes(item.toLowerCase()))) return '部分成交后失效'
+  if (['已失效', '失效', 'expired'].some((item) => value.includes(item.toLowerCase()))) return '已失效'
+  if (['废单', 'rejected'].some((item) => value.includes(item.toLowerCase()))) return '废单'
+  if (['失败', 'failed'].some((item) => value.includes(item.toLowerCase()))) return '失败'
+  return status || '-'
 }

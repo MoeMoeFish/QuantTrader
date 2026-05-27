@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import os
 import re
 import sys
 import time
@@ -21,6 +22,7 @@ import win32process
 from pywinauto import Application, Desktop
 from pywinauto.application import ProcessNotFoundError
 from pywinauto.findwindows import ElementNotFoundError
+from PIL import Image, ImageEnhance, ImageFilter, ImageGrab
 
 
 OrderSide = Literal["buy", "sell"]
@@ -52,7 +54,7 @@ class ThsDesktopAdapter:
     - 使用 WM_CHAR 填写买入/卖出表单。
     - 自行处理委托确认、提示、撤单确认等弹窗。
     - 读取余额使用控件 ID。
-    - 表格读取使用 Ctrl+A/C 复制，不做验证码自动识别。
+    - 表格读取使用 Ctrl+A/C 复制，验证码优先 OCR 自动识别，失败再人工兜底。
     - 撤单支持直接点击撤单页按钮，绕开原 easytrader 的 OCR 依赖。
     """
 
@@ -94,6 +96,7 @@ class ThsDesktopAdapter:
         self.captcha_code = captcha_code
         self.wait_manual_captcha = wait_manual_captcha
         self.manual_captcha_timeout = manual_captcha_timeout
+        self.auto_captcha = os.getenv("THS_AUTO_CAPTCHA", "1").strip().lower() not in {"0", "false", "no"}
         self.app: Application | None = None
         self.main: Any | None = None
 
@@ -160,6 +163,42 @@ class ThsDesktopAdapter:
             "window_class": main.class_name(),
             "window_rect": str(main.rectangle()),
             "account": self.get_account_info(),
+        }
+
+    def prepare_trading_workspace(self) -> dict[str, Any]:
+        """启动/连接交易端，并验证下单和查询页面都可用。"""
+        _, main = self.ensure_connected()
+        self.close_pop_dialogs()
+
+        checks: dict[str, Any] = {
+            "buy_form_ready": False,
+            "balance_page_ready": False,
+        }
+
+        self.switch_menu(["买入[F1]"], sleep_seconds=0.5)
+        checks["buy_form_ready"] = self._has_trade_form_controls()
+        if not checks["buy_form_ready"]:
+            raise TradingClientNotReadyError(
+                "同花顺交易端已连接，但无法打开买入委托页面或未找到证券代码/价格/数量输入框。"
+                "请确认交易端已登录并进入网上股票交易系统。"
+            )
+
+        self.switch_menu(["查询[F4]", "资金股票"], sleep_seconds=0.5)
+        checks["balance_page_ready"] = self._has_balance_controls()
+        if not checks["balance_page_ready"]:
+            raise TradingClientNotReadyError(
+                "同花顺买入委托页面可用，但无法打开 查询[F4]/资金股票。"
+                "请确认交易端已登录、资金账号可见并允许查询。"
+            )
+
+        return {
+            "connected": True,
+            "ready": True,
+            "window_title": main.window_text(),
+            "window_class": main.class_name(),
+            "window_rect": str(main.rectangle()),
+            "account": self.get_account_info(),
+            "checks": checks,
         }
 
     def get_account_info(self) -> dict[str, Any]:
@@ -235,23 +274,48 @@ class ThsDesktopAdapter:
 
     def get_positions(self) -> list[dict[str, Any]]:
         self.switch_menu(["查询[F4]", "资金股票"])
-        return self.read_grid()
+        try:
+            return self.read_grid()
+        except RuntimeError as exc:
+            if "未找到同花顺表格控件" in str(exc):
+                return []
+            raise
 
     def get_today_orders(self) -> list[dict[str, Any]]:
         self.switch_menu(["查询[F4]", "当日委托"])
-        return self.read_grid()
+        try:
+            return self.read_grid()
+        except RuntimeError as exc:
+            if "未找到同花顺表格控件" in str(exc):
+                return []
+            raise
 
     def get_today_trades(self) -> list[dict[str, Any]]:
         self.switch_menu(["查询[F4]", "当日成交"])
-        return self.read_grid()
+        try:
+            return self.read_grid()
+        except RuntimeError as exc:
+            if "未找到同花顺表格控件" in str(exc):
+                return []
+            raise
 
     def get_history_orders(self) -> list[dict[str, Any]]:
         self.switch_menu(["查询[F4]", "历史委托"])
-        return self.read_grid()
+        try:
+            return self.read_grid()
+        except RuntimeError as exc:
+            if "未找到同花顺表格控件" in str(exc):
+                return []
+            raise
 
     def get_history_trades(self) -> list[dict[str, Any]]:
         self.switch_menu(["查询[F4]", "历史成交"])
-        return self.read_grid()
+        try:
+            return self.read_grid()
+        except RuntimeError as exc:
+            if "未找到同花顺表格控件" in str(exc):
+                return []
+            raise
 
     def buy(self, symbol: str, price: str | float | Decimal, quantity: int) -> dict[str, Any]:
         return self.place_order(
@@ -413,6 +477,7 @@ class ThsDesktopAdapter:
 
     def read_grid(self) -> list[dict[str, Any]]:
         _, main = self.ensure_connected()
+        self._handle_captcha_dialog_if_present()
         grid = self._find_grid()
         self._set_foreground(grid)
         rect = grid.rectangle()
@@ -421,6 +486,7 @@ class ThsDesktopAdapter:
             coords=(rect.left + 20, rect.top + 20),
         )
         time.sleep(0.1)
+        self._handle_captcha_dialog_if_present()
         pywinauto.keyboard.send_keys("^a^c")
         time.sleep(0.3)
         if self._handle_captcha_dialog_if_present():
@@ -625,28 +691,225 @@ class ThsDesktopAdapter:
                 pass
 
     def _handle_captcha_dialog_if_present(self) -> bool:
-        app, _ = self.ensure_connected()
-        try:
-            top = app.top_window()
-        except Exception:
+        dialog = self._find_captcha_dialog()
+        if dialog is None:
             return False
 
-        if self._is_captcha_dialog(top):
-            if self.captcha_code:
-                self._submit_captcha_dialog(top, self.captcha_code)
-            elif self.wait_manual_captcha:
+        self._set_foreground(dialog)
+        if self.captcha_code:
+            self._submit_captcha_dialog(dialog, self.captcha_code)
+            self._wait_for_dialog_closed(dialog, 10)
+        elif self.auto_captcha:
+            if self._auto_submit_captcha_dialog(dialog):
+                time.sleep(0.8)
+                return True
+            if self.wait_manual_captcha:
                 print(
-                    f"检测到验证码弹窗，请在同花顺中手动输入验证码并点击确定，"
+                    f"验证码自动识别失败，请在同花顺中手动输入验证码并点击确定，"
                     f"脚本将在最多 {self.manual_captcha_timeout} 秒内等待弹窗关闭后继续。",
                     file=sys.stderr,
                     flush=True,
                 )
-                self._wait_for_dialog_closed(top, self.manual_captcha_timeout)
+                self._wait_for_dialog_closed(dialog, self.manual_captcha_timeout)
             else:
-                raise CaptchaRequiredError()
-            time.sleep(0.8)
-            return True
-        return False
+                raise CaptchaRequiredError("检测到验证码弹窗，但自动识别失败。")
+        elif self.wait_manual_captcha:
+            print(
+                f"检测到验证码弹窗，请在同花顺中手动输入验证码并点击确定，"
+                f"脚本将在最多 {self.manual_captcha_timeout} 秒内等待弹窗关闭后继续。",
+                file=sys.stderr,
+                flush=True,
+            )
+            self._wait_for_dialog_closed(dialog, self.manual_captcha_timeout)
+        else:
+            raise CaptchaRequiredError()
+        time.sleep(0.8)
+        return True
+
+    def _auto_submit_captcha_dialog(self, dialog: Any) -> bool:
+        tried_codes: set[str] = set()
+        for _ in range(4):
+            time.sleep(0.5)
+            if not self._is_dialog_still_captcha(dialog):
+                return True
+            captcha_code = self._recognize_captcha_dialog(dialog)
+            if not captcha_code or captcha_code in tried_codes:
+                continue
+            tried_codes.add(captcha_code)
+            self._submit_captcha_dialog(dialog, captcha_code)
+            try:
+                self._wait_for_dialog_closed(dialog, 4)
+                return True
+            except TimeoutError:
+                continue
+        return not self._is_dialog_still_captcha(dialog)
+
+    def _is_dialog_still_captcha(self, dialog: Any) -> bool:
+        try:
+            return dialog.exists(timeout=0.2) and self._is_captcha_dialog(dialog)
+        except Exception:
+            return False
+
+    def _find_captcha_dialog(self) -> Any | None:
+        app, _ = self.ensure_connected()
+        windows: list[Any] = []
+        try:
+            windows.append(app.top_window())
+        except Exception:
+            pass
+        try:
+            windows.extend(app.windows())
+        except Exception:
+            pass
+        try:
+            process_id = app.process
+            for window in Desktop(backend="win32").windows():
+                try:
+                    _, window_pid = win32process.GetWindowThreadProcessId(window.handle)
+                except Exception:
+                    continue
+                if window_pid == process_id:
+                    windows.append(window)
+        except Exception:
+            pass
+
+        seen: set[int] = set()
+        for window in windows:
+            try:
+                handle = int(window.handle)
+                if handle in seen:
+                    continue
+                seen.add(handle)
+                if window.is_visible() and self._is_captcha_dialog(window):
+                    return window
+            except Exception:
+                continue
+        return None
+
+    def _recognize_captcha_dialog(self, dialog: Any) -> str | None:
+        try:
+            image = self._capture_captcha_image(dialog)
+            return self._ocr_captcha_image(image)
+        except Exception:
+            return None
+
+    def _capture_captcha_image(self, dialog: Any) -> Image.Image:
+        edit_rect = None
+        candidates: list[Any] = []
+        dialog_rect = dialog.rectangle()
+
+        for child in dialog.children():
+            try:
+                class_name = child.class_name()
+                rect = child.rectangle()
+                if class_name == "Edit":
+                    edit_rect = rect
+                    continue
+                if class_name == "Button" or not child.is_visible():
+                    continue
+                width = rect.width()
+                height = rect.height()
+                text = child.window_text() or ""
+                if class_name == "Static" and 30 <= width <= 220 and 14 <= height <= 90 and "验证码" not in text:
+                    candidates.append(child)
+            except Exception:
+                continue
+
+        if edit_rect is not None and candidates:
+            nearby_candidates = []
+            for child in candidates:
+                rect = child.rectangle()
+                horizontal_gap = min(abs(rect.left - edit_rect.right), abs(edit_rect.left - rect.right))
+                vertical_overlap = min(rect.bottom, edit_rect.bottom) - max(rect.top, edit_rect.top)
+                if horizontal_gap <= 18 and vertical_overlap > 0:
+                    nearby_candidates.append(child)
+            if nearby_candidates:
+                target = max(nearby_candidates, key=lambda item: item.rectangle().width() * item.rectangle().height())
+                rect = target.rectangle()
+                return ImageGrab.grab(bbox=(rect.left, rect.top, rect.right, rect.bottom))
+
+        if edit_rect is not None:
+            left = max(dialog_rect.left, edit_rect.left - 180)
+            top = max(dialog_rect.top, edit_rect.top - 8)
+            right = min(dialog_rect.right, edit_rect.left - 4)
+            bottom = min(dialog_rect.bottom, edit_rect.bottom + 8)
+            if right - left >= 30 and bottom - top >= 14:
+                return ImageGrab.grab(bbox=(left, top, right, bottom))
+
+        return ImageGrab.grab(
+            bbox=(
+                dialog_rect.left + 20,
+                dialog_rect.top + 45,
+                dialog_rect.right - 20,
+                min(dialog_rect.bottom - 45, dialog_rect.top + 145),
+            )
+        )
+
+    def _ocr_captcha_image(self, image: Image.Image) -> str | None:
+        pytesseract = self._load_pytesseract()
+        if pytesseract is None:
+            return None
+
+        candidates = self._preprocess_captcha_images(image)
+        config = "--psm 7 -c tessedit_char_whitelist=0123456789"
+        for candidate in candidates:
+            try:
+                text = pytesseract.image_to_string(candidate, config=config)
+            except Exception:
+                continue
+            code = re.sub(r"\D", "", text or "")
+            if 4 <= len(code) <= 6:
+                return code
+        return None
+
+    def _load_pytesseract(self) -> Any | None:
+        try:
+            import pytesseract
+        except Exception:
+            return None
+
+        tesseract_cmd = os.getenv("TESSERACT_CMD") or os.getenv("TESSERACT_OCR_PATH")
+        if tesseract_cmd:
+            pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+        return pytesseract
+
+    def _preprocess_captcha_images(self, image: Image.Image) -> list[Image.Image]:
+        base = image.convert("L")
+        base = ImageEnhance.Contrast(base).enhance(2.4)
+        base = base.resize((base.width * 3, base.height * 3))
+        denoised = base.filter(ImageFilter.MedianFilter(size=3))
+        variants = [denoised]
+
+        for threshold in (120, 145, 170, 195):
+            variants.append(denoised.point(lambda pixel, limit=threshold: 255 if pixel > limit else 0))
+
+        try:
+            import cv2
+            import numpy as np
+
+            array = np.array(base)
+            array = cv2.GaussianBlur(array, (3, 3), 0)
+            _, otsu = cv2.threshold(array, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            adaptive = cv2.adaptiveThreshold(
+                array,
+                255,
+                cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                cv2.THRESH_BINARY,
+                31,
+                8,
+            )
+            kernel = np.ones((2, 2), np.uint8)
+            variants.extend(
+                [
+                    Image.fromarray(otsu),
+                    Image.fromarray(cv2.morphologyEx(otsu, cv2.MORPH_OPEN, kernel)),
+                    Image.fromarray(adaptive),
+                ]
+            )
+        except Exception:
+            pass
+
+        return variants
 
     def _is_captcha_dialog(self, dialog: Any) -> bool:
         try:

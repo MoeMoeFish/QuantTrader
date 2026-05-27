@@ -23,6 +23,14 @@ cd /d "%BACKEND_DIR%"
 
 echo [INFO] Backend directory: %CD%
 echo [INFO] THS client path uses backend default or existing THS_CLIENT_PATH env.
+if not defined TESSERACT_CMD (
+  if exist "E:\Tesseract-OCR\tesseract.exe" set "TESSERACT_CMD=E:\Tesseract-OCR\tesseract.exe"
+)
+if defined TESSERACT_CMD (
+  echo [INFO] Tesseract OCR: %TESSERACT_CMD%
+) else (
+  echo [WARN] Tesseract OCR not configured. Captcha OCR will fall back to manual input.
+)
 echo [INFO] Starting QuantFlow backend at http://127.0.0.1:8000
 echo [INFO] Press Ctrl+C to stop.
 echo.

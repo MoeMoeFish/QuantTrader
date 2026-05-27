@@ -36,6 +36,8 @@ class PaperTradingEngine:
             return empty("rejected", "委托价格和数量必须大于 0")
 
         reference_price = self._reference_price(request.side, quote)
+        if reference_price <= 0:
+            return empty("submitted", "暂无可用实时盘口，订单保持待成交")
         fill_price = self.slippage_calculator.apply(request.side, reference_price)
         if not self._passes_limit_price(request, fill_price):
             return empty("submitted", "限价条件未满足，订单保持待成交")
