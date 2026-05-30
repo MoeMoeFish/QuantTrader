@@ -45,6 +45,27 @@ export interface RealTimeQuote {
   float_market_cap: number | null
   pe_ratio: number | null
   pb_ratio: number | null
+  // 五档盘口
+  buy1_price: number | null
+  buy1_volume: number | null
+  buy2_price: number | null
+  buy2_volume: number | null
+  buy3_price: number | null
+  buy3_volume: number | null
+  buy4_price: number | null
+  buy4_volume: number | null
+  buy5_price: number | null
+  buy5_volume: number | null
+  sell1_price: number | null
+  sell1_volume: number | null
+  sell2_price: number | null
+  sell2_volume: number | null
+  sell3_price: number | null
+  sell3_volume: number | null
+  sell4_price: number | null
+  sell4_volume: number | null
+  sell5_price: number | null
+  sell5_volume: number | null
   timestamp: string
 }
 

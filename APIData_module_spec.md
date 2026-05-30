@@ -116,17 +116,45 @@ CREATE TABLE kline_data (
 ```sql
 CREATE TABLE realtime_quote (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    symbol VARCHAR(10) NOT NULL UNIQUE COMMENT '股票代码',
+    symbol VARCHAR(20) NOT NULL UNIQUE COMMENT '股票代码',
     name VARCHAR(100) COMMENT '股票名称',
-    last_price DECIMAL(10,3) COMMENT '最新价',
-    open_price DECIMAL(10,3) COMMENT '开盘价',
-    high_price DECIMAL(10,3) COMMENT '最高价',
-    low_price DECIMAL(10,3) COMMENT '最低价',
-    volume BIGINT COMMENT '成交量',
-    amount DECIMAL(20,3) COMMENT '成交额',
-    update_time TIMESTAMP COMMENT '更新时间',
+    last_price FLOAT NOT NULL COMMENT '最新价',
+    `change` FLOAT COMMENT '涨跌额',
+    change_pct FLOAT COMMENT '涨跌幅(%)',
+    `open` FLOAT COMMENT '开盘价',
+    high_price FLOAT COMMENT '最高价',
+    low_price FLOAT COMMENT '最低价',
+    volume FLOAT COMMENT '成交量',
+    turnover FLOAT COMMENT '成交额',
+    amplitude FLOAT COMMENT '振幅(%)',
+    market_cap FLOAT COMMENT '总市值',
+    float_market_cap FLOAT COMMENT '流通市值',
+    pe_ratio FLOAT COMMENT '市盈率',
+    pb_ratio FLOAT COMMENT '市净率',
+    buy1_price FLOAT COMMENT '买一价',
+    buy1_volume FLOAT COMMENT '买一量',
+    buy2_price FLOAT COMMENT '买二价',
+    buy2_volume FLOAT COMMENT '买二量',
+    buy3_price FLOAT COMMENT '买三价',
+    buy3_volume FLOAT COMMENT '买三量',
+    buy4_price FLOAT COMMENT '买四价',
+    buy4_volume FLOAT COMMENT '买四量',
+    buy5_price FLOAT COMMENT '买五价',
+    buy5_volume FLOAT COMMENT '买五量',
+    sell1_price FLOAT COMMENT '卖一价',
+    sell1_volume FLOAT COMMENT '卖一量',
+    sell2_price FLOAT COMMENT '卖二价',
+    sell2_volume FLOAT COMMENT '卖二量',
+    sell3_price FLOAT COMMENT '卖三价',
+    sell3_volume FLOAT COMMENT '卖三量',
+    sell4_price FLOAT COMMENT '卖四价',
+    sell4_volume FLOAT COMMENT '卖四量',
+    sell5_price FLOAT COMMENT '卖五价',
+    sell5_volume FLOAT COMMENT '卖五量',
+    quote_timestamp TIMESTAMP COMMENT '数据时间戳',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_symbol (symbol)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
@@ -176,12 +204,40 @@ class RealTimeQuote(BaseModel):
     symbol: str
     name: str | None = None
     last_price: float
-    open_price: float
-    high_price: float
-    low_price: float
-    volume: int
-    amount: float | None = None
-    update_time: datetime
+    change: float
+    change_pct: float
+    open: float
+    high: float
+    low: float
+    volume: float
+    turnover: float | None = None
+    amplitude: float | None = None
+    market_cap: float | None = None
+    float_market_cap: float | None = None
+    pe_ratio: float | None = None
+    pb_ratio: float | None = None
+    # 五档盘口
+    buy1_price: float | None = None
+    buy1_volume: float | None = None
+    buy2_price: float | None = None
+    buy2_volume: float | None = None
+    buy3_price: float | None = None
+    buy3_volume: float | None = None
+    buy4_price: float | None = None
+    buy4_volume: float | None = None
+    buy5_price: float | None = None
+    buy5_volume: float | None = None
+    sell1_price: float | None = None
+    sell1_volume: float | None = None
+    sell2_price: float | None = None
+    sell2_volume: float | None = None
+    sell3_price: float | None = None
+    sell3_volume: float | None = None
+    sell4_price: float | None = None
+    sell4_volume: float | None = None
+    sell5_price: float | None = None
+    sell5_volume: float | None = None
+    timestamp: datetime
 
 class SectorInfo(BaseModel):
     sector_code: str

@@ -50,6 +50,27 @@ class RealTimeQuote(BaseModel):
     float_market_cap: Optional[float] = None
     pe_ratio: Optional[float] = None
     pb_ratio: Optional[float] = None
+    # 五档盘口数据
+    buy1_price: Optional[float] = None
+    buy1_volume: Optional[float] = None
+    buy2_price: Optional[float] = None
+    buy2_volume: Optional[float] = None
+    buy3_price: Optional[float] = None
+    buy3_volume: Optional[float] = None
+    buy4_price: Optional[float] = None
+    buy4_volume: Optional[float] = None
+    buy5_price: Optional[float] = None
+    buy5_volume: Optional[float] = None
+    sell1_price: Optional[float] = None
+    sell1_volume: Optional[float] = None
+    sell2_price: Optional[float] = None
+    sell2_volume: Optional[float] = None
+    sell3_price: Optional[float] = None
+    sell3_volume: Optional[float] = None
+    sell4_price: Optional[float] = None
+    sell4_volume: Optional[float] = None
+    sell5_price: Optional[float] = None
+    sell5_volume: Optional[float] = None
     timestamp: datetime
 
 

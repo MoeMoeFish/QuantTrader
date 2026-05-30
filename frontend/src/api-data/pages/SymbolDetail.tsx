@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
-import { ArrowLeft, RefreshCw } from 'lucide-react'
+import { ArrowLeft, RefreshCw, TrendingUp, TrendingDown } from 'lucide-react'
 import { AppLayout } from '@/common/components'
 import { formatNumber, formatPercent } from '@/common/utils'
 import {
@@ -10,6 +10,9 @@ import {
   getSectorStocks,
 } from '@/api-data/api'
 import type { StockBaseInfo, KLineData, RealTimeQuote, StockListItem } from '@/api-data/types'
+
+// 五档盘口类型
+type OrderLevel = { price: number | null; volume: number | null }
 
 // 支持的K线周期
 const TIMEFRAMES = ['1m', '5m', '15m', '30m', '1h', '1d', '1w']
@@ -76,6 +79,29 @@ export default function SymbolDetail() {
   const ma5 = calcMA(klines, 5)
   const ma10 = calcMA(klines, 10)
   const ma20 = calcMA(klines, 20)
+
+  // 五档数据
+  const buyLevels: OrderLevel[] = [
+    { price: quote?.buy1_price, volume: quote?.buy1_volume },
+    { price: quote?.buy2_price, volume: quote?.buy2_volume },
+    { price: quote?.buy3_price, volume: quote?.buy3_volume },
+    { price: quote?.buy4_price, volume: quote?.buy4_volume },
+    { price: quote?.buy5_price, volume: quote?.buy5_volume },
+  ]
+  const sellLevels: OrderLevel[] = [
+    { price: quote?.sell1_price, volume: quote?.sell1_volume },
+    { price: quote?.sell2_price, volume: quote?.sell2_volume },
+    { price: quote?.sell3_price, volume: quote?.sell3_volume },
+    { price: quote?.sell4_price, volume: quote?.sell4_volume },
+    { price: quote?.sell5_price, volume: quote?.sell5_volume },
+  ]
+
+  // 格式化成交量（手）
+  function formatVolume(vol: number | null) {
+    if (vol === null || vol === 0) return '-'
+    if (vol >= 10000) return `${(vol / 10000).toFixed(2)}万`
+    return Math.floor(vol).toString()
+  }
 
   // 简单的K线柱状图渲染
   function renderKLineChart() {
@@ -166,6 +192,49 @@ export default function SymbolDetail() {
             <div className="bg-surface-container-high rounded-lg p-4">
               <div className="text-xs text-on-surface-variant mb-1">最低价</div>
               <div className="text-xl font-bold font-mono-num text-down">{formatNumber(quote.low)}</div>
+            </div>
+          </div>
+        )}
+
+        {/* 五档盘口 */}
+        {quote && (buyLevels.some(l => l.price) || sellLevels.some(l => l.price)) && (
+          <div className="bg-surface-container-high rounded-lg p-4">
+            <h3 className="text-sm font-semibold mb-3">五档盘口</h3>
+            <div className="grid grid-cols-2 gap-6">
+              {/* 买盘 */}
+              <div>
+                <div className="text-xs text-on-surface-variant mb-2">买盘</div>
+                <div className="space-y-1">
+                  {buyLevels.map((level, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm">
+                      <span className="text-on-surface-variant w-8">买{i + 1}</span>
+                      <span className={`font-mono-num ${level.price && level.price > (quote.last_price || 0) ? 'text-down' : ''}`}>
+                        {level.price ? formatNumber(level.price) : '-'}
+                      </span>
+                      <span className="font-mono-num text-on-surface-variant w-20 text-right">
+                        {formatVolume(level.volume)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* 卖盘 */}
+              <div>
+                <div className="text-xs text-on-surface-variant mb-2">卖盘</div>
+                <div className="space-y-1">
+                  {sellLevels.map((level, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm">
+                      <span className="text-on-surface-variant w-8">卖{i + 1}</span>
+                      <span className={`font-mono-num ${level.price && level.price < (quote.last_price || 0) ? 'text-up' : ''}`}>
+                        {level.price ? formatNumber(level.price) : '-'}
+                      </span>
+                      <span className="font-mono-num text-on-surface-variant w-20 text-right">
+                        {formatVolume(level.volume)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}

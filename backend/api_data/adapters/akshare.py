@@ -176,9 +176,70 @@ class AkshareAdapter(DataSourceAdapter):
                     return []
 
     async def get_realtime_quote(self, symbol: str) -> dict:
-        """获取实时行情"""
+        """获取实时行情（含五档盘口）"""
         try:
-            # 使用单只股票查询
+            # 使用 stock_zh_a_spot_em 获取实时行情（含五档）
+            df = ak.stock_zh_a_spot_em()
+
+            # 查找目标股票
+            stock_row = df[df['代码'] == symbol]
+
+            if stock_row.empty:
+                # 如果实时数据没有，尝试使用历史数据
+                return await self._get_quote_from_history(symbol)
+
+            row = stock_row.iloc[0]
+
+            # 提取五档数据
+            quote = {
+                "symbol": symbol,
+                "name": str(row.get('名称', symbol)),
+                "last_price": float(row.get('最新价', 0)),
+                "change": float(row.get('涨跌额', 0)),
+                "change_pct": float(row.get('涨跌幅', 0)),
+                "open": float(row.get('今开', 0)),
+                "high": float(row.get('最高', 0)),
+                "low": float(row.get('最低', 0)),
+                "volume": float(row.get('成交量', 0)),
+                "turnover": float(row.get('成交额', 0)),
+                "amplitude": float(row.get('振幅', 0)),
+                "market_cap": float(row.get('总市值', 0)) if row.get('总市值') else None,
+                "float_market_cap": float(row.get('流通市值', 0)) if row.get('流通市值') else None,
+                "pe_ratio": float(row.get('市盈率-动态', 0)) if row.get('市盈率-动态') else None,
+                "pb_ratio": float(row.get('市净率', 0)) if row.get('市净率') else None,
+                # 五档盘口
+                "buy1_price": float(row.get('买一价', 0)) if row.get('买一价') else None,
+                "buy1_volume": float(row.get('买一量', 0)) if row.get('买一量') else None,
+                "buy2_price": float(row.get('买二价', 0)) if row.get('买二价') else None,
+                "buy2_volume": float(row.get('买二量', 0)) if row.get('买二量') else None,
+                "buy3_price": float(row.get('买三价', 0)) if row.get('买三价') else None,
+                "buy3_volume": float(row.get('买三量', 0)) if row.get('买三量') else None,
+                "buy4_price": float(row.get('买四价', 0)) if row.get('买四价') else None,
+                "buy4_volume": float(row.get('买四量', 0)) if row.get('买四量') else None,
+                "buy5_price": float(row.get('买五价', 0)) if row.get('买五价') else None,
+                "buy5_volume": float(row.get('买五量', 0)) if row.get('买五量') else None,
+                "sell1_price": float(row.get('卖一价', 0)) if row.get('卖一价') else None,
+                "sell1_volume": float(row.get('卖一量', 0)) if row.get('卖一量') else None,
+                "sell2_price": float(row.get('卖二价', 0)) if row.get('卖二价') else None,
+                "sell2_volume": float(row.get('卖二量', 0)) if row.get('卖二量') else None,
+                "sell3_price": float(row.get('卖三价', 0)) if row.get('卖三价') else None,
+                "sell3_volume": float(row.get('卖三量', 0)) if row.get('卖三量') else None,
+                "sell4_price": float(row.get('卖四价', 0)) if row.get('卖四价') else None,
+                "sell4_volume": float(row.get('卖四量', 0)) if row.get('卖四量') else None,
+                "sell5_price": float(row.get('卖五价', 0)) if row.get('卖五价') else None,
+                "sell5_volume": float(row.get('卖五量', 0)) if row.get('卖五量') else None,
+                "timestamp": datetime.now(),
+            }
+
+            return quote
+
+        except Exception as e:
+            logger.error(f"get_realtime_quote error for {symbol}: {e}")
+            return await self._create_empty_quote(symbol)
+
+    async def _get_quote_from_history(self, symbol: str) -> dict:
+        """从历史数据获取行情（备用方案）"""
+        try:
             df = ak.stock_zh_a_hist(
                 symbol=symbol,
                 period="daily",
@@ -211,11 +272,31 @@ class AkshareAdapter(DataSourceAdapter):
                 "float_market_cap": None,
                 "pe_ratio": None,
                 "pb_ratio": None,
+                # 五档为空
+                "buy1_price": None,
+                "buy1_volume": None,
+                "buy2_price": None,
+                "buy2_volume": None,
+                "buy3_price": None,
+                "buy3_volume": None,
+                "buy4_price": None,
+                "buy4_volume": None,
+                "buy5_price": None,
+                "buy5_volume": None,
+                "sell1_price": None,
+                "sell1_volume": None,
+                "sell2_price": None,
+                "sell2_volume": None,
+                "sell3_price": None,
+                "sell3_volume": None,
+                "sell4_price": None,
+                "sell4_volume": None,
+                "sell5_price": None,
+                "sell5_volume": None,
                 "timestamp": datetime.now(),
             }
-
         except Exception as e:
-            logger.error(f"get_realtime_quote error for {symbol}: {e}")
+            logger.error(f"_get_quote_from_history error for {symbol}: {e}")
             return await self._create_empty_quote(symbol)
 
     async def _create_empty_quote(self, symbol: str) -> dict:
@@ -236,6 +317,27 @@ class AkshareAdapter(DataSourceAdapter):
             "float_market_cap": None,
             "pe_ratio": None,
             "pb_ratio": None,
+            # 五档为空
+            "buy1_price": None,
+            "buy1_volume": None,
+            "buy2_price": None,
+            "buy2_volume": None,
+            "buy3_price": None,
+            "buy3_volume": None,
+            "buy4_price": None,
+            "buy4_volume": None,
+            "buy5_price": None,
+            "buy5_volume": None,
+            "sell1_price": None,
+            "sell1_volume": None,
+            "sell2_price": None,
+            "sell2_volume": None,
+            "sell3_price": None,
+            "sell3_volume": None,
+            "sell4_price": None,
+            "sell4_volume": None,
+            "sell5_price": None,
+            "sell5_volume": None,
             "timestamp": datetime.now(),
         }
 
