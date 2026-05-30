@@ -3,6 +3,9 @@ import { lazy } from 'react'
 // 懒加载各模块页面
 export const HomePage = lazy(() => import('@/api-data/pages/Dashboard'))
 export const ApiDataPage = lazy(() => import('@/api-data/pages/ApiData'))
+export const ApiDataDebugPage = lazy(() => import('@/api-data/pages/ApiDataDebug'))
+export const SimpleDebugPage = lazy(() => import('@/api-data/pages/SimpleDebug'))
+export const TestPage = lazy(() => import('@/api-data/pages/TestPage'))
 export const SymbolDetailPage = lazy(() => import('@/api-data/pages/SymbolDetail'))
 export const AccountPage = lazy(() => import('@/account-trading/pages/Account'))
 export const StrategiesPage = lazy(() => import('@/strategy-engine/pages/Strategies'))

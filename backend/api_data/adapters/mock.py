@@ -71,6 +71,27 @@ def generate_mock_realtime_quote(symbol: str, name: str) -> dict:
     change = random.uniform(-10, 10)
     change_pct = (change / base_price) * 100
 
+    # 生成五档盘口数据
+    def generate_level(price_offset: float) -> tuple:
+        price = base_price + price_offset
+        if price <= 0:
+            price = base_price * 0.5
+        return round(price, 2), round(random.uniform(10000, 100000), 2)
+
+    # 买盘（价格递减）
+    buy1_price, buy1_volume = generate_level(-0.01)
+    buy2_price, buy2_volume = generate_level(-0.02)
+    buy3_price, buy3_volume = generate_level(-0.03)
+    buy4_price, buy4_volume = generate_level(-0.04)
+    buy5_price, buy5_volume = generate_level(-0.05)
+
+    # 卖盘（价格递增）
+    sell1_price, sell1_volume = generate_level(0.01)
+    sell2_price, sell2_volume = generate_level(0.02)
+    sell3_price, sell3_volume = generate_level(0.03)
+    sell4_price, sell4_volume = generate_level(0.04)
+    sell5_price, sell5_volume = generate_level(0.05)
+
     return {
         "symbol": symbol,
         "name": name,
@@ -87,6 +108,27 @@ def generate_mock_realtime_quote(symbol: str, name: str) -> dict:
         "float_market_cap": round(base_price * random.uniform(500000000, 5000000000), 2),
         "pe_ratio": round(random.uniform(5, 50), 2),
         "pb_ratio": round(random.uniform(0.5, 5), 2),
+        # 五档盘口
+        "buy1_price": buy1_price,
+        "buy1_volume": buy1_volume,
+        "buy2_price": buy2_price,
+        "buy2_volume": buy2_volume,
+        "buy3_price": buy3_price,
+        "buy3_volume": buy3_volume,
+        "buy4_price": buy4_price,
+        "buy4_volume": buy4_volume,
+        "buy5_price": buy5_price,
+        "buy5_volume": buy5_volume,
+        "sell1_price": sell1_price,
+        "sell1_volume": sell1_volume,
+        "sell2_price": sell2_price,
+        "sell2_volume": sell2_volume,
+        "sell3_price": sell3_price,
+        "sell3_volume": sell3_volume,
+        "sell4_price": sell4_price,
+        "sell4_volume": sell4_volume,
+        "sell5_price": sell5_price,
+        "sell5_volume": sell5_volume,
         "timestamp": datetime.now(),
     }
 

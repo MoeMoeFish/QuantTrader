@@ -569,13 +569,18 @@ async def list_stocks(db: AsyncSession = Depends(get_db)):
 ### 12.1 配置数据源
 ```python
 # 选择使用哪个数据源
-data_source = AkshareAdapter()
+from api_data.adapters.mock import MockAdapter
+from api_data.adapters.akshare import AkshareAdapter
+
+data_source = MockAdapter()  # 模拟数据（开发/演示用）
 # 或
-data_source = BaostockAdapter()
+data_source = AkshareAdapter()  # 真实市场数据（需网络通畅）
 
 # 初始化服务
 stock_service = StockService(data_source, StockRepository())
 ```
+
+**切换数据源**：修改 `backend/common/dependencies.py` 中的 `get_data_source()` 函数。
 
 ### 12.2 获取数据（自动处理缓存）
 ```python
@@ -614,56 +619,66 @@ await stock_service.batch_sync_stock_base_to_db(["000001", "000002"])
 
 ---
 
-## 14. 开发状态 (2026-05-21)
+## 14. 开发状态 (2026-05-30)
 
 ### Phase 1: 已完成 ✅
 - [x] `backend/api_data/models.py` - SQLAlchemy 模型
   - StockBaseInfoModel, KLineDataModel, RealtimeQuoteModel, SectorInfoModel
   - 继承 Base + TimestampMixin
+  - 支持五档盘口字段（买一到买五、卖一到卖五）
 - [x] `backend/api_data/schemas.py` - Pydantic 模型
   - StockBaseInfo, KLineData, RealTimeQuote, SectorInfo
-  - 请求模型: KLineQuery, BatchStockQuery, StockSyncRequest, KLineSyncRequest
+  - 请求模型: KLineQuery, BatchStockQuery, StockSyncRequest, KLineSyncRequest, StockSearchQuery
 - [x] `backend/api_data/repository.py` - Repository 层
-  - StockRepository, KLineRepository, RealtimeQuoteRepository, SectorRepository
-  - 所有方法为 async def
+  - StockRepository 支持名称模糊搜索
+  - KLineRepository, RealtimeQuoteRepository, SectorRepository
 - [x] `backend/api_data/adapters/base.py` - DataSourceAdapter Protocol
-- [x] `backend/api_data/adapters/mock.py` - MockAdapter (内存测试数据)
-- [x] `backend/api_data/adapters/__init__.py`
+- [x] `backend/api_data/adapters/mock.py` - MockAdapter（含五档盘口模拟数据）
+- [x] `backend/api_data/adapters/akshare.py` - AkshareAdapter（真实市场数据）
 - [x] `backend/api_data/service.py` - Service 层
-  - StockService, KLineService, MarketDataService, SectorService
-  - 依赖注入 data_source + repository
-- [x] `backend/api_data/router.py` - API 接口已实现
-- [x] `backend/common/dependencies.py` - get_data_source() 依赖注入
-- [x] `frontend/src/api-data/types/index.ts` - TypeScript 类型
-- [x] `frontend/src/api-data/api/index.ts` - API 请求函数
-- [x] `frontend/src/api-data/pages/ApiData.tsx` - 股票搜索和列表
-- [x] `frontend/src/api-data/pages/SymbolDetail.tsx` - 股票详情+K线图表
-- [x] `frontend/src/api-data/pages/Dashboard.tsx` - 市场概览
+- [x] `backend/api_data/router.py` - API 接口
+- [x] `frontend/src/api-data/` - 完整前端页面
 
-### Phase 2: 已完成 ✅
-- [x] 创建 `AkshareAdapter` 实现真实的 akshare 数据调用
-- [x] 数据库表创建脚本 (`backend/api_data/init_db.py`)
-- [ ] 创建 `BaostockAdapter` 实现真实的 baostock 数据调用（可选）
-- [ ] 数据同步调度机制
+### 新增功能 (2026-05-30) ✅
+- [x] K线级别选择 - 支持 1m/5m/15m/30m/1h/1d/1w
+- [x] 股票名称模糊搜索 - 支持代码和名称搜索
+- [x] 五档盘口数据 - 买一到买五、卖一到卖五
+- [x] 数据库唯一索引 - (symbol, timeframe, timestamp) 防止重复
 
 ### 当前数据源
-- **使用**: AkshareAdapter (真实市场数据)
-- **位置**: `backend/api_data/adapters/akshare.py`
+- **使用**: MockAdapter（模拟数据，演示用）
+- **位置**: `backend/api_data/adapters/mock.py`
 - **切换方式**: 修改 `backend/common/dependencies.py` 中的 `get_data_source()`
-- **注意**: K线数据接口可能不稳定（有重试机制）
+- **备选**: AkshareAdapter（真实市场数据，需网络通畅）
 
-### 当前数据库
-- **配置**: MySQL (阿里云 RDS)
-- **连接信息**: 见 `backend/.env`
-- **表结构**: `backend/api_data/init_db.py`
+**数据源对比**：
+| 特性 | MockAdapter | AkshareAdapter |
+|------|-------------|-----------------|
+| 数据来源 | 内存模拟 | akshare API |
+| 网络依赖 | 无 | 有（可能不稳定）|
+| 五档盘口 | 有 | 有 |
+| K线级别 | 全部支持 | 全部支持 |
+| 适用场景 | 开发/演示 | 生产环境 |
 
-### API 端点测试结果
+### 数据库表结构
+- **kline_data** - 支持 (symbol, timeframe, timestamp) 唯一索引
+- **realtime_quote** - 包含五档盘口字段
+- **初始化脚本**: `backend/api_data/init_db.py`
+
+### API 端点
 ```
-✅ GET /api/api-data/stock/list          → 5519只真实股票
-⚠️  GET /api/api-data/kline/000001       → K线接口不稳定（网络问题）
-✅ GET /api/api-data/realtime/000001     → 实时行情正常
-⚠️  GET /api/api-data/sector              → 板块接口不稳定（网络问题）
+✅ GET  /api/api-data/stock/list          → 股票列表
+✅ GET  /api/api-data/stock/search       → 名称/代码模糊搜索
+✅ GET  /api/api-data/stock/{symbol}/base → 个股基础信息
+✅ GET  /api/api-data/kline/{symbol}     → K线数据（含级别）
+✅ GET  /api/api-data/realtime/{symbol}  → 实时行情（含五档）
+✅ POST /api/api-data/realtime/batch    → 批量实时行情
+✅ GET  /api/api-data/sector             → 板块列表
 ```
+
+### 前端页面
+- **股票列表**: `/api-data` - 搜索、筛选、列表展示
+- **股票详情**: `/symbol-detail?symbol=xxx` - 行情、五档、K线、基本信息
 
 ### 待其他模块调用的接口
 其他模块可通过以下方式获取股票数据：

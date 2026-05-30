@@ -20,6 +20,7 @@ request.interceptors.response.use(
   (response) => {
     // 解包统一响应格式 {success: True, data: ..., message: ...}
     const res = response.data
+    console.log('Response interceptor:', res)
     if (res && typeof res === 'object' && 'success' in res && 'data' in res) {
       if (res.success === true) {
         return res.data

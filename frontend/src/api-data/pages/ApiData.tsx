@@ -6,7 +6,6 @@ import { formatNumber, formatPercent } from '@/common/utils'
 import { getStockList, searchStocks, getBatchRealtimeQuote } from '@/api-data/api'
 import type { StockListItem, RealTimeQuote } from '@/api-data/types'
 
-// 防抖Hook
 function useDebounce<T>(value: T, delay: number): T {
   const [debouncedValue, setDebouncedValue] = useState<T>(value)
 
@@ -14,7 +13,6 @@ function useDebounce<T>(value: T, delay: number): T {
     const handler = setTimeout(() => {
       setDebouncedValue(value)
     }, delay)
-
     return () => {
       clearTimeout(handler)
     }
@@ -31,23 +29,29 @@ export default function ApiData() {
   const [selectedMarket, setSelectedMarket] = useState<string | undefined>(undefined)
   const [isSearchMode, setIsSearchMode] = useState(false)
 
-  // 防抖搜索
   const debouncedSearch = useDebounce(search, 300)
 
   // 加载股票列表
   const loadStocks = useCallback(async () => {
     setLoading(true)
     try {
+      console.log('Loading stocks with market:', selectedMarket)
       const list = await getStockList(selectedMarket)
+      console.log('Loaded stocks:', list.length)
       setStocks(list)
       setIsSearchMode(false)
+
       // 批量获取实时行情
       if (list.length > 0) {
         const symbols = list.slice(0, 20).map(s => s.symbol)
-        const quotesData = await getBatchRealtimeQuote({ symbols })
-        const quotesMap: Record<string, RealTimeQuote> = {}
-        quotesData.forEach(q => { quotesMap[q.symbol] = q })
-        setQuotes(quotesMap)
+        try {
+          const quotesData = await getBatchRealtimeQuote({ symbols })
+          const quotesMap: Record<string, RealTimeQuote> = {}
+          quotesData.forEach(q => { quotesMap[q.symbol] = q })
+          setQuotes(quotesMap)
+        } catch (e) {
+          console.error('Failed to load quotes:', e)
+        }
       }
     } catch (e) {
       console.error('Failed to load stocks:', e)
@@ -65,16 +69,23 @@ export default function ApiData() {
 
     setLoading(true)
     try {
+      console.log('Searching stocks with keyword:', debouncedSearch)
       const list = await searchStocks({ keyword: debouncedSearch, market: selectedMarket, limit: 100 })
+      console.log('Search results:', list.length)
       setStocks(list)
       setIsSearchMode(true)
+
       // 批量获取实时行情
       if (list.length > 0) {
         const symbols = list.slice(0, 20).map(s => s.symbol)
-        const quotesData = await getBatchRealtimeQuote({ symbols })
-        const quotesMap: Record<string, RealTimeQuote> = {}
-        quotesData.forEach(q => { quotesMap[q.symbol] = q })
-        setQuotes(quotesMap)
+        try {
+          const quotesData = await getBatchRealtimeQuote({ symbols })
+          const quotesMap: Record<string, RealTimeQuote> = {}
+          quotesData.forEach(q => { quotesMap[q.symbol] = q })
+          setQuotes(quotesMap)
+        } catch (e) {
+          console.error('Failed to load quotes:', e)
+        }
       }
     } catch (e) {
       console.error('Failed to search stocks:', e)
@@ -89,15 +100,29 @@ export default function ApiData() {
     loadStocks()
   }
 
+  // 初始加载和市场变化时加载
   useEffect(() => {
+    console.log('Effect triggered for market:', selectedMarket)
     loadStocks()
-  }, [selectedMarket, loadStocks])
+  }, [selectedMarket])
 
+  // 搜索变化时执行搜索（不依赖 searchStocksData 避免循环）
   useEffect(() => {
     if (debouncedSearch) {
-      searchStocksData()
+      setLoading(true)
+      searchStocks({ keyword: debouncedSearch, market: selectedMarket, limit: 100 })
+        .then(list => {
+          console.log('Search results:', list.length)
+          setStocks(list)
+          setIsSearchMode(true)
+          setLoading(false)
+        })
+        .catch(e => {
+          console.error('Search failed:', e)
+          setLoading(false)
+        })
     }
-  }, [debouncedSearch, searchStocksData])
+  }, [debouncedSearch, selectedMarket])
 
   return (
     <AppLayout>
@@ -143,6 +168,12 @@ export default function ApiData() {
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
+        </div>
+
+        {/* 状态提示 */}
+        <div className="flex items-center gap-4 text-sm text-on-surface-variant">
+          <span>股票数量: {stocks.length}</span>
+          {loading && <span>加载中...</span>}
         </div>
 
         {/* 股票列表 */}

@@ -3,6 +3,9 @@ import { Suspense } from 'react'
 import {
   HomePage,
   ApiDataPage,
+  ApiDataDebugPage,
+  SimpleDebugPage,
+  TestPage,
   SymbolDetailPage,
   AccountPage,
   StrategiesPage,
@@ -27,6 +30,9 @@ export default function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/api-data" element={<ApiDataPage />} />
+          <Route path="/api-data-debug" element={<ApiDataDebugPage />} />
+          <Route path="/simple-debug" element={<SimpleDebugPage />} />
+          <Route path="/test-page" element={<TestPage />} />
           <Route path="/symbol-detail" element={<SymbolDetailPage />} />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/strategies" element={<StrategiesPage />} />
