@@ -7,7 +7,9 @@ import {
   SimpleDebugPage,
   TestPage,
   SymbolDetailPage,
-  AccountPage,
+  AccountManagementPage,
+  TradingDeskPage,
+  OrderQueryPage,
   StrategiesPage,
   StrategyEditorPage,
   ExecutionPage,
@@ -34,7 +36,10 @@ export default function App() {
           <Route path="/simple-debug" element={<SimpleDebugPage />} />
           <Route path="/test-page" element={<TestPage />} />
           <Route path="/symbol-detail" element={<SymbolDetailPage />} />
-          <Route path="/account" element={<AccountPage />} />
+          <Route path="/account" element={<AccountManagementPage />} />
+          <Route path="/account/manage" element={<AccountManagementPage />} />
+          <Route path="/account/trading" element={<TradingDeskPage />} />
+          <Route path="/account/orders" element={<OrderQueryPage />} />
           <Route path="/strategies" element={<StrategiesPage />} />
           <Route path="/strategy-editor" element={<StrategyEditorPage />} />
           <Route path="/execution" element={<ExecutionPage />} />
