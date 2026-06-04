@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, Any
@@ -26,7 +28,6 @@ from .repository import (
     RealtimeQuoteRepository,
     SectorRepository,
 )
-from __future__ import annotations
 
 import json
 import re
@@ -37,7 +38,6 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from fastapi import APIRouter, Query
-
 
 router = APIRouter(prefix="/api/api-data", tags=["API对接-行情数据"])
 
