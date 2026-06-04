@@ -1,5 +1,11 @@
 import axios from 'axios'
 
+interface ApiResponse<T> {
+  success: boolean
+  data: T
+  message: string
+}
+
 const request = axios.create({
   baseURL: '/api',
   timeout: 15000,
@@ -23,14 +29,15 @@ request.interceptors.response.use(
     console.log('Response interceptor:', res)
     if (res && typeof res === 'object' && 'success' in res && 'data' in res) {
       if (res.success === true) {
-        return res.data
+        // 返回完整响应对象，供 callApi 访问 message
+        return res as ApiResponse<unknown>
       } else {
         // 服务器返回的错误
         return Promise.reject(new Error(res.message || '请求失败'))
       }
     }
-    // 非统一格式直接返回
-    return res
+    // 非统一格式包装成 ApiResponse 格式
+    return { success: true, data: res, message: '' } as ApiResponse<unknown>
   },
   (error) => {
     console.error('API Error:', error?.response?.data || error.message)
