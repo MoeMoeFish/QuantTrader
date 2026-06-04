@@ -88,3 +88,7 @@ logs/
 *.pptx
 *.xlsx
 *.csv
+
+# 平台生成文件
+assets/
+.cozeproj/
