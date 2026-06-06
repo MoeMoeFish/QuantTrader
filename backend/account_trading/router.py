@@ -777,7 +777,18 @@ async def place_order(payload: OrderRequest, db: AsyncSession = Depends(get_db))
 @router.post("/order/{entrust_no}/cancel", response_model=ApiResponse)
 async def cancel_order(entrust_no: str, payload: CancelRequest | None = None, db: AsyncSession = Depends(get_db)):
     payload = payload or CancelRequest()
+    mode = payload.mode or "live"
     try:
+        # ── 模拟盘撤单 ──
+        if mode in ("paper", "backtest"):
+            repo = AccountTradingRepository(db)
+            account = await repo.get_account(payload.account_id)
+            if not account:
+                raise_api_error(ValueError(f"账户 {payload.account_id} 不存在"))
+            result = await repo.cancel_paper_order(account, entrust_no)
+            return ok(result, "模拟盘撤单成功")
+
+        # ── 实盘撤单 ──
         repo, account, _ = await get_account_context(db, payload.account_id, require_live=True)
         client_path = await repo.get_active_client_path(account)
         task = await repo.create_task(

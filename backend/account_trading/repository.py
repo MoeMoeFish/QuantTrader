@@ -951,6 +951,45 @@ class AccountTradingRepository:
             },
         )
 
+    async def cancel_paper_order(self, account: TradingAccount, order_id: str) -> dict[str, Any]:
+        """模拟盘撤单：将 pending 状态的订单改为 cancelled"""
+        if account.account_type != "paper":
+            return {"success": False, "message": "仅模拟盘支持此撤单接口"}
+        # 模拟盘 order_id 是 order_no (PORD-...)，需要按 order_no 查找
+        order_cls = self._order_cls(account)
+        result = await self.db.execute(
+            select(order_cls).where(
+                order_cls.account_id == account.id,
+                order_cls.order_no == order_id,
+            )
+        )
+        order = result.scalar_one_or_none()
+        if order is None:
+            return {"success": False, "message": f"未找到委托 {order_id}"}
+        if order.status not in ("pending", "submitted", "partial_fill"):
+            return {"success": False, "message": f"委托状态为 {order.status}，无法撤单"}
+        from_status = order.status
+        order.status = "cancelled"
+        order.canceled_at = _now()
+        # 归还冻结资金
+        if order.side == "buy" and order.price and order.quantity:
+            frozen = Decimal(str(order.price)) * Decimal(str(order.quantity))
+            balance_row = await self._latest_paper_balance_snapshot(account)
+            if balance_row is not None:
+                balance_row.frozen_cash = (balance_row.frozen_cash or Decimal("0")) - frozen
+                balance_row.available_cash = (balance_row.available_cash or Decimal("0")) + frozen
+        await self._append_order_status_log(
+            account=account,
+            order=order,
+            from_status=from_status,
+            to_status="cancelled",
+            event_type="cancel_request",
+            event_source="paper_engine",
+            detail={"order_id": order_id},
+            message="模拟盘撤单成功",
+        )
+        return {"success": True, "message": "撤单成功", "order_id": order_id, "status": "cancelled"}
+
     async def save_cancel_result(self, account: TradingAccount, entrust_no: str, result: dict[str, Any]) -> None:
         order = await self._find_order(account, entrust_no)
         if order is not None:
