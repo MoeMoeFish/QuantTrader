@@ -292,6 +292,31 @@ export default function TradingDesk() {
       setSelectedOrderKeys([])
       setTrades(data.trades)
     }
+    // 模拟盘自动调用实时行情刷新持仓盈亏
+    if (selectedAccount?.account_type === 'paper' && accountId) {
+      refreshPositionsRealtime(accountId)
+    }
+  }
+
+  async function refreshPositionsRealtime(accountId = selectedAccountId) {
+    if (!accountId) return
+    const data = await callApi<Position[]>('positions_refresh', () =>
+      request.get('/account/positions/refresh', {
+        params: { account_id: accountId },
+        timeout: 15000,
+      })
+    )
+    if (data) {
+      setPositions(data)
+      // 同时刷新余额（市值已更新）
+      const balData = await callApi<Balance>('balance', () =>
+        request.get('/account/balance', {
+          params: { account_id: accountId },
+          timeout: 10000,
+        })
+      )
+      if (balData) setBalance(balData)
+    }
   }
 
   async function syncAccount() {
@@ -689,6 +714,14 @@ export default function TradingDesk() {
                 <TabButton active={workspaceTab === 'logs'} label="日志" onClick={() => setWorkspaceTab('logs')} />
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                {workspaceTab === 'positions' && selectedAccount?.account_type === 'paper' && (
+                  <ActionButton
+                    label="刷新行情"
+                    icon={<RefreshCcw className="size-4" />}
+                    onClick={() => refreshPositionsRealtime()}
+                    disabled={Boolean(busy)}
+                  />
+                )}
                 {(workspaceTab === 'orders' || workspaceTab === 'trades') && (
                   <div className="flex flex-wrap gap-1 rounded-md bg-surface-container p-1">
                     <TabButton active={scope === 'today'} label="当日" onClick={() => switchScope('today')} />

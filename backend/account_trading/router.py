@@ -415,6 +415,29 @@ async def get_account_snapshot(
         raise_api_error(exc)
 
 
+@router.get("/positions/refresh", response_model=ApiResponse)
+async def refresh_positions_with_realtime(
+    account_id: int = Query(..., gt=0),
+    db: AsyncSession = Depends(get_db),
+):
+    """刷新持仓：调用实时行情更新 last_price 并重新计算浮动盈亏。"""
+    try:
+        repo = AccountTradingRepository(db)
+        account = await get_managed_account(repo, account_id)
+        if account.account_type == "paper":
+            result = await repo.refresh_paper_market_value(account)
+            positions = result.get("positions", [])
+        elif account.account_type == "live":
+            await repo.expire_today_unfilled_orders(account)
+            positions = await repo.list_latest_positions(account)
+        else:
+            await repo.expire_today_unfilled_orders(account)
+            positions = await repo.list_latest_positions(account)
+        return ok(positions, "持仓已刷新，实时行情已更新")
+    except Exception as exc:
+        raise_api_error(exc)
+
+
 @router.get("/balance", response_model=ApiResponse)
 async def get_balance(
     account_id: int | None = Query(default=None, gt=0),

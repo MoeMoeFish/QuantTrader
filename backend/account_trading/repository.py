@@ -289,6 +289,7 @@ class AccountTradingRepository:
         ]
 
     async def refresh_paper_market_value(self, account: TradingAccount) -> dict[str, Any]:
+        """刷新模拟盘持仓市值：调用腾讯实时行情更新 last_price，重新计算市值与浮动盈亏。"""
         if account.account_type != "paper":
             raise ValueError("当前账户不是模拟账户")
         await self.expire_today_unfilled_orders(account)
@@ -307,9 +308,26 @@ class AccountTradingRepository:
             )
             return {"balance": balance, "positions": []}
 
-        refreshed: list[dict[str, Any]] = []
+        # 批量获取实时行情
+        symbols = [row.symbol for row in positions if row.symbol]
+        realtime_quotes: dict[str, Decimal] = {}
+        if symbols:
+            try:
+                from api_data.router import fetch_tencent_quote
+                for symbol in symbols:
+                    try:
+                        quote = fetch_tencent_quote(symbol)
+                        if quote and quote.get("last_price"):
+                            realtime_quotes[symbol] = Decimal(str(quote["last_price"]))
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+        # 用实时行情更新每个持仓的 last_price
         for row in positions:
-            last_price = Decimal(str(row.last_price or row.cost_price or "0"))
+            realtime_price = realtime_quotes.get(row.symbol)
+            last_price = realtime_price if realtime_price else Decimal(str(row.last_price or row.cost_price or "0"))
             await self._upsert_paper_position_snapshot(
                 account,
                 symbol=row.symbol,
@@ -321,8 +339,8 @@ class AccountTradingRepository:
                 last_price=last_price,
                 raw={
                     "event": "paper_market_value_refresh",
-                    "quote": None,
-                    "note": "未接入上游实时行情时沿用本地最新价，避免固定兜底价污染模拟持仓。",
+                    "quote_source": "tencent_realtime" if realtime_price else "local_fallback",
+                    "realtime_price": str(realtime_price) if realtime_price else None,
                 },
             )
         refreshed = await self.list_latest_positions(account)
