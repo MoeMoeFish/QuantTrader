@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
 from common.dependencies import get_db
+from common.utils.response import ApiResponse
 
 from .adapters.ths_desktop import CaptchaRequiredError, TradingClientNotReadyError
 from .repository import AccountTradingRepository, _normalize_order_status
@@ -24,12 +25,6 @@ OrderScope = Literal["today", "history"]
 ManagedAccountType = Literal["live", "paper", "backtest"]
 ManagedAccountStatus = Literal["active", "inactive", "archived"]
 BindingType = Literal["desktop", "ths", "webapi", "mock", "backtest"]
-
-
-class ApiResponse(BaseModel):
-    success: bool
-    data: Any = None
-    message: str = ""
 
 
 class AccountManageRequest(BaseModel):

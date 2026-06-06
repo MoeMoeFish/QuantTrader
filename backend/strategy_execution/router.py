@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.dependencies import get_db
+from common.utils.response import ApiResponse
 
 from .models import Execution, ExecutionSignal, RiskAlert, RiskRule, ExecutionLog
 from .schemas import (
@@ -23,12 +24,6 @@ from .schemas import (
 
 
 router = APIRouter(prefix="/api/execution", tags=["策略执行与风控"])
-
-
-class ApiResponse(BaseModel):
-    success: bool
-    data: Any = None
-    message: str = ""
 
 
 class PaginatedResponse(BaseModel):

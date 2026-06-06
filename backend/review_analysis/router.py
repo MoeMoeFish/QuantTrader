@@ -8,17 +8,12 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.dependencies import get_db
+from common.utils.response import ApiResponse
 
 from .repository import ReviewAnalysisRepository
 
 
 router = APIRouter(prefix="/api/review", tags=["复盘分析"])
-
-
-class ApiResponse(BaseModel):
-    success: bool
-    data: Any = None
-    message: str = ""
 
 
 class GenerateReviewRequest(BaseModel):

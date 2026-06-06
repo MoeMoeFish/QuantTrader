@@ -14,15 +14,10 @@ from account_trading.backtest_engine import BacktestBar, BacktestContext, Backte
 from account_trading.backtest_engine.schemas import FeeRule, SlippageRule
 from account_trading.models import BacktestRun, BacktestTrade
 from common.dependencies import get_db
+from common.utils.response import ApiResponse
 
 
 router = APIRouter(prefix="/api/replay", tags=["历史回放"])
-
-
-class ApiResponse(BaseModel):
-    success: bool
-    data: Any = None
-    message: str = ""
 
 
 class FeeRulePayload(BaseModel):

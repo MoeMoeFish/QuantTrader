@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from ._db import Base, TimestampMixin
@@ -47,8 +48,9 @@ class ExecutionSignal(Base):
     order_status = Column(String(20), nullable=True)
     filled_price = Column(Float, nullable=True)
     filled_quantity = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     pnl = Column(Float, nullable=True)
-    created_at = Column(DateTime, nullable=False)
 
     execution = relationship("Execution", back_populates="signals")
 
