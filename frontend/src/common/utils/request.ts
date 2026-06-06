@@ -23,17 +23,19 @@ request.interceptors.request.use(
 )
 
 request.interceptors.response.use(
-  (response: AxiosResponse) => {
+  (response: AxiosResponse<ApiResponse>) => {
     const res = response.data
+    // 后端统一返回 { success, data, message }
     if (res && typeof res === 'object' && 'success' in res) {
       if (res.success === false) {
         return Promise.reject(new Error(res.message || '请求失败'))
       }
-      // 成功时，将 message 附加到 AxiosResponse 对象上
-      // 这样 callApi 可以通过 response._message 访问
-      ;(response as AxiosResponse & { _message: string })._message = res.message || ''
+      // 成功时直接解包，返回 response.data（即 { success, data, message }）
+      // 这样调用方 request.get().data 得到内部 data，request.get().message 得到 message
+      return res as any
     }
-    return response
+    // 非标准格式直接返回
+    return response.data as any
   },
   (error) => {
     console.error('API Error:', error?.response?.data || error.message)
@@ -50,27 +52,20 @@ export async function callApi<T>(
   options?: { method?: 'get' | 'post' | 'put' | 'delete'; data?: unknown }
 ): Promise<{ data: T; message: string }> {
   const method = options?.method || 'get'
-  let response: AxiosResponse
+  let response: ApiResponse<T>
 
   try {
     if (method === 'post') {
-      response = await request.post(config as string, options?.data)
+      response = await request.post(config as string, options?.data) as unknown as ApiResponse<T>
     } else if (method === 'put') {
-      response = await request.put(config as string, options?.data)
+      response = await request.put(config as string, options?.data) as unknown as ApiResponse<T>
     } else if (method === 'delete') {
-      response = await request.delete(config as string)
+      response = await request.delete(config as string) as unknown as ApiResponse<T>
     } else {
-      response = await request.get(config as string)
+      response = await request.get(config as string) as unknown as ApiResponse<T>
     }
 
-    // 尝试解包统一格式
-    const res = response.data as ApiResponse<T>
-    if (res && typeof res === 'object' && 'success' in res && 'data' in res) {
-      return { data: res.data, message: res.message || '' }
-    }
-
-    // 非标准格式直接返回
-    return { data: response.data as T, message: '' }
+    return { data: response.data, message: response.message || '' }
   } catch (error: unknown) {
     const err = error as { message?: string }
     throw new Error(err.message || '请求失败')
