@@ -3,7 +3,6 @@ import request from '@/common/utils/request'
 import { Loader2, RefreshCcw } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
-type ApiResponse<T> = { success: boolean; data: T; message: string }
 type Scope = 'today' | 'history'
 type TabKey = 'orders' | 'trades' | 'logs'
 
@@ -85,14 +84,14 @@ export default function OrderQuery() {
     void refreshLogs(false)
   }, [])
 
-  async function callApi<T>(label: string, work: () => Promise<ApiResponse<T>>) {
+  async function callApi<T>(label: string, work: () => Promise<T>) {
     setBusy(label)
     setMessage('')
     setError('')
     try {
-      const response = await work()
-      setMessage(response.message)
-      return response.data
+      const data = await work()
+      setMessage('')
+      return data
     } catch (err: any) {
       const detail = err?.response?.data?.detail
       setError(detail?.message || err?.message || '请求失败')
@@ -104,7 +103,7 @@ export default function OrderQuery() {
 
   async function refreshAccounts() {
     const data = await callApi<ManagedAccount[]>('accounts', () =>
-      request.get('/account/accounts', { timeout: apiTimeout }) as Promise<ApiResponse<ManagedAccount[]>>
+      request.get('/account/accounts', { timeout: apiTimeout })
     )
     if (data) {
       const activeAccounts = data.filter((account) => account.status !== 'archived')
@@ -126,7 +125,7 @@ export default function OrderQuery() {
           manual_captcha_timeout: 180,
         },
         timeout: apiTimeout,
-      }) as Promise<ApiResponse<OrderRow[]>>
+      })
     )
     if (data) setOrders(data)
   }
@@ -141,7 +140,7 @@ export default function OrderQuery() {
           manual_captcha_timeout: 180,
         },
         timeout: apiTimeout,
-      }) as Promise<ApiResponse<TradeRow[]>>
+      })
     )
     if (data) setTrades(data)
   }
@@ -151,10 +150,10 @@ export default function OrderQuery() {
       request.get('/account/automation/logs', {
         params: { limit: 60 },
         timeout: apiTimeout,
-      }) as Promise<ApiResponse<AutomationLog[]>>
+      })
     if (!showBusy) {
-      const response = await work()
-      setLogs(response.data)
+      const data = await work()
+      setLogs(data)
       return
     }
     const data = await callApi<AutomationLog[]>('logs', work)

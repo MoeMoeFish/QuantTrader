@@ -3,12 +3,6 @@ import request from '@/common/utils/request'
 import { AlertTriangle, Loader2, Pencil, Plus, RefreshCcw, ShieldCheck, Star, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
-type ApiResponse<T> = {
-  success: boolean
-  data: T
-  message: string
-}
-
 type AccountBinding = {
   id: number
   binding_type: string
@@ -62,14 +56,14 @@ export default function AccountManagement() {
     void refreshAccounts()
   }, [])
 
-  async function callApi<T>(label: string, work: () => Promise<ApiResponse<T>>) {
+  async function callApi<T>(label: string, work: () => Promise<T>) {
     setBusy(label)
     setError('')
     setMessage('')
     try {
-      const response = await work()
-      setMessage(response.message)
-      return response.data
+      const data = await work()
+      setMessage('')
+      return data
     } catch (err: any) {
       const detail = err?.response?.data?.detail
       setError(detail?.message || err?.message || '请求失败')
@@ -81,14 +75,14 @@ export default function AccountManagement() {
 
   async function refreshAccounts() {
     const data = await callApi<ManagedAccount[]>('list', () =>
-      request.get('/account/accounts', { timeout: apiTimeout }) as Promise<ApiResponse<ManagedAccount[]>>
+      request.get('/account/accounts', { timeout: apiTimeout })
     )
     if (data) setAccounts(data.filter((account) => account.status !== 'archived'))
   }
 
   async function fillFromCurrentClient() {
     const data = await callApi<any>('status', () =>
-      request.get('/account/automation/status', { timeout: apiTimeout }) as Promise<ApiResponse<any>>
+      request.get('/account/automation/status', { timeout: apiTimeout })
     )
     const account = data?.account
     if (!account) return
@@ -156,9 +150,9 @@ export default function AccountManagement() {
       meta_json: metaJson,
     }
     const data = await callApi<ManagedAccount>(editingId ? 'update' : 'create', () =>
-      (editingId
+      editingId
         ? request.put(`/account/accounts/${editingId}`, payload, { timeout: apiTimeout })
-        : request.post('/account/accounts', payload, { timeout: apiTimeout })) as Promise<ApiResponse<ManagedAccount>>
+        : request.post('/account/accounts', payload, { timeout: apiTimeout })
     )
     if (data) {
       setEditingId(null)
@@ -171,7 +165,7 @@ export default function AccountManagement() {
     if (!pendingDelete) return
     const deletingId = pendingDelete.id
     const data = await callApi<ManagedAccount>('delete', () =>
-      request.post(`/account/accounts/${deletingId}/archive`, {}, { timeout: apiTimeout }) as Promise<ApiResponse<ManagedAccount>>
+      request.post(`/account/accounts/${deletingId}/archive`, {}, { timeout: apiTimeout })
     )
     if (data) {
       if (editingId === deletingId) {
@@ -185,7 +179,7 @@ export default function AccountManagement() {
 
   async function setDefaultAccount(id: number) {
     const data = await callApi<ManagedAccount>('default', () =>
-      request.post(`/account/accounts/${id}/default`, {}, { timeout: apiTimeout }) as Promise<ApiResponse<ManagedAccount>>
+      request.post(`/account/accounts/${id}/default`, {}, { timeout: apiTimeout })
     )
     if (data) await refreshAccounts()
   }

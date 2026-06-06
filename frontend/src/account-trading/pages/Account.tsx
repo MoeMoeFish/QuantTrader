@@ -15,12 +15,6 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
-type ApiResponse<T> = {
-  success: boolean
-  data: T
-  message: string
-}
-
 type Balance = {
   account_id: string
   mode: string
@@ -196,15 +190,15 @@ export default function Account() {
     void refreshLogs()
   }, [])
 
-  async function callApi<T>(label: string, work: () => Promise<ApiResponse<T>>) {
+  async function callApi<T>(label: string, work: () => Promise<T>) {
     setBusy(label)
     setError('')
     setMessage('')
     try {
-      const response = await work()
-      setMessage(response.message)
+      const data = await work()
+      setMessage('')
       await refreshLogs(false)
-      return response.data
+      return data
     } catch (err: any) {
       const detail = err?.response?.data?.detail
       const text = detail?.message || err?.message || '请求失败'
@@ -218,14 +212,14 @@ export default function Account() {
 
   async function refreshStatus() {
     const data = await callApi<AutomationStatus>('status', () =>
-      request.get('/account/automation/status', { timeout: apiTimeout }) as Promise<ApiResponse<AutomationStatus>>
+      request.get('/account/automation/status', { timeout: apiTimeout })
     )
     if (data) setStatus(data)
   }
 
   async function refreshAccounts() {
     const data = await callApi<ManagedAccount[]>('accounts', () =>
-      request.get('/account/accounts', { timeout: apiTimeout }) as Promise<ApiResponse<ManagedAccount[]>>
+      request.get('/account/accounts', { timeout: apiTimeout })
     )
     if (data) setAccounts(data)
   }
@@ -319,7 +313,7 @@ export default function Account() {
     const data = await callApi<ManagedAccount>(editingAccountId ? 'account_update' : 'account_create', () =>
       (editingAccountId
         ? request.put(`/account/accounts/${editingAccountId}`, payload, { timeout: apiTimeout })
-        : request.post('/account/accounts', payload, { timeout: apiTimeout })) as Promise<ApiResponse<ManagedAccount>>
+        : request.post('/account/accounts', payload, { timeout: apiTimeout }))
     )
     if (data) {
       await refreshAccounts()
@@ -329,14 +323,14 @@ export default function Account() {
 
   async function archiveAccount(accountId: number) {
     const data = await callApi<ManagedAccount>('account_archive', () =>
-      request.post(`/account/accounts/${accountId}/archive`, {}, { timeout: apiTimeout }) as Promise<ApiResponse<ManagedAccount>>
+      request.post(`/account/accounts/${accountId}/archive`, {}, { timeout: apiTimeout })
     )
     if (data) await refreshAccounts()
   }
 
   async function setDefaultAccount(accountId: number) {
     const data = await callApi<ManagedAccount>('account_default', () =>
-      request.post(`/account/accounts/${accountId}/default`, {}, { timeout: apiTimeout }) as Promise<ApiResponse<ManagedAccount>>
+      request.post(`/account/accounts/${accountId}/default`, {}, { timeout: apiTimeout })
     )
     if (data) await refreshAccounts()
   }
@@ -346,7 +340,7 @@ export default function Account() {
       request.get('/account/balance', {
         params: captchaParams(),
         timeout: apiTimeout,
-      }) as Promise<ApiResponse<Balance>>
+      })
     )
     if (data) setBalance(data)
   }
@@ -356,7 +350,7 @@ export default function Account() {
       request.get('/account/positions', {
         params: captchaParams(),
         timeout: apiTimeout,
-      }) as Promise<ApiResponse<Position[]>>
+      })
     )
     if (data) setPositions(data)
   }
@@ -366,7 +360,7 @@ export default function Account() {
       request.get('/account/orders', {
         params: { scope: 'today', ...captchaParams() },
         timeout: apiTimeout,
-      }) as Promise<ApiResponse<OrderRow[]>>
+      })
     )
     if (data) setOrders(data)
   }
@@ -376,7 +370,7 @@ export default function Account() {
       request.get('/account/trades', {
         params: { scope: 'today', ...captchaParams() },
         timeout: apiTimeout,
-      }) as Promise<ApiResponse<TradeRow[]>>
+      })
     )
     if (data) setTrades(data)
   }
@@ -386,10 +380,10 @@ export default function Account() {
       request.get('/account/automation/logs', {
         params: { limit: 30 },
         timeout: apiTimeout,
-      }) as Promise<ApiResponse<AutomationLog[]>>
+      })
     if (!showBusy) {
-      const response = await work()
-      setLogs(response.data)
+      const data = await work()
+      setLogs(data)
       return
     }
     const data = await callApi<AutomationLog[]>('logs', work)
@@ -407,7 +401,7 @@ export default function Account() {
         '/account/sync',
         { wait_manual_captcha: waitCaptcha, manual_captcha_timeout: 180 },
         { timeout: apiTimeout }
-      ) as Promise<ApiResponse<{ balance: Balance; positions: Position[]; orders: OrderRow[]; trades: TradeRow[] }>>
+      )
     )
     if (data) {
       setBalance(data.balance)
@@ -434,7 +428,7 @@ export default function Account() {
           manual_captcha_timeout: 180,
         },
         { timeout: apiTimeout }
-      ) as Promise<ApiResponse<Record<string, unknown>>>
+      )
     )
     if (data) {
       await refreshOrders()
@@ -450,7 +444,7 @@ export default function Account() {
         `/account/order/${encodeURIComponent(cancelEntrustNo.trim())}/cancel`,
         { wait_manual_captcha: waitCaptcha, manual_captcha_timeout: 180 },
         { timeout: apiTimeout }
-      ) as Promise<ApiResponse<Record<string, unknown>>>
+      )
     )
     if (data) {
       await refreshOrders()

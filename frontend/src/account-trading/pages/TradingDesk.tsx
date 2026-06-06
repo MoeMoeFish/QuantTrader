@@ -3,7 +3,6 @@ import request from '@/common/utils/request'
 import { Activity, Ban, ClipboardList, Loader2, RefreshCcw, ShieldCheck, Wallet } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-type ApiResponse<T> = { success: boolean; data: T; message: string }
 type Balance = {
   total_asset: string
   available_cash: string
@@ -211,12 +210,11 @@ export default function TradingDesk() {
     const timer = window.setTimeout(async () => {
       setSecurityLookupBusy(true)
       try {
-        const response = await request.get('/api-data/security-lookup', {
+        const data = await request.get('/api-data/security-lookup', {
           params: { keyword, side: orderForm.side },
           timeout: 10000,
-        }) as ApiResponse<SecurityLookup>
+        }) as SecurityLookup
         if (canceled) return
-        const data = response.data
         setSecurityLookup(data?.symbol ? data : null)
         if (data?.symbol) {
           setOrderForm((prev) => ({
@@ -237,14 +235,14 @@ export default function TradingDesk() {
     }
   }, [securityQuery, orderForm.side])
 
-  async function callApi<T>(label: string, work: () => Promise<ApiResponse<T>>) {
+  async function callApi<T>(label: string, work: () => Promise<T>) {
     setBusy(label)
     setError('')
     setMessage('')
     try {
-      const response = await work()
-      setMessage(response.message)
-      return response.data
+      const data = await work()
+      setMessage('')
+      return data
     } catch (err: any) {
       const detail = err?.response?.data?.detail
       setError(detail?.message || err?.message || '请求失败')
@@ -260,14 +258,14 @@ export default function TradingDesk() {
         '/account/automation/connect',
         { account_id: selectedAccountId || undefined },
         { timeout: apiTimeout }
-      ) as Promise<ApiResponse<AutomationStatus>>
+      )
     )
     if (data) setStatus(data)
   }
 
   async function refreshAccounts() {
     const data = await callApi<ManagedAccount[]>('accounts', () =>
-      request.get('/account/accounts', { timeout: apiTimeout }) as Promise<ApiResponse<ManagedAccount[]>>
+      request.get('/account/accounts', { timeout: apiTimeout })
     )
     if (data) {
       setAccounts(data.filter((account) => account.status !== 'archived'))
@@ -285,7 +283,7 @@ export default function TradingDesk() {
       request.get('/account/snapshot', {
         params: { account_id: accountId, scope: nextScope },
         timeout: apiTimeout,
-      }) as Promise<ApiResponse<AccountSnapshot>>
+      })
     )
     if (data) {
       setBalance(data.balance)
@@ -310,7 +308,7 @@ export default function TradingDesk() {
           manual_captcha_timeout: 180,
         },
         { timeout: apiTimeout }
-      ) as Promise<ApiResponse<AccountSnapshot>>
+      )
     )
     if (data) {
       setBalance(data.balance)
@@ -332,7 +330,7 @@ export default function TradingDesk() {
           manual_captcha_timeout: 180,
         },
         timeout: apiTimeout,
-      }) as Promise<ApiResponse<OrderRow[]>>
+      })
     )
     if (data) {
       setOrders(data)
@@ -352,7 +350,7 @@ export default function TradingDesk() {
           manual_captcha_timeout: 180,
         },
         timeout: apiTimeout,
-      }) as Promise<ApiResponse<TradeRow[]>>
+      })
     )
     if (data) setTrades(data)
   }
@@ -362,10 +360,10 @@ export default function TradingDesk() {
       request.get('/account/automation/logs', {
         params: { limit: 60 },
         timeout: apiTimeout,
-      }) as Promise<ApiResponse<AutomationLog[]>>
+      })
     if (!showBusy) {
-      const response = await work()
-      setLogs(response.data)
+      const data = await work()
+      setLogs(data)
       return
     }
     const data = await callApi<AutomationLog[]>('logs', work)
@@ -400,7 +398,7 @@ export default function TradingDesk() {
           manual_captcha_timeout: 180,
         },
         { timeout: apiTimeout }
-      ) as Promise<ApiResponse<PlaceOrderResult>>
+      )
     )
     if (data) {
       const notice = orderResultNotice(data)
@@ -464,7 +462,7 @@ export default function TradingDesk() {
           manual_captcha_timeout: 180,
         },
         { timeout: apiTimeout }
-      ) as Promise<ApiResponse<Record<string, unknown>>>
+      )
     )
     if (data) {
       setMessage(`已提交撤单请求：合同编号 ${entrustNo}。请以同步后的当日委托状态为准。`)
@@ -492,7 +490,7 @@ export default function TradingDesk() {
             manual_captcha_timeout: 180,
           },
           { timeout: apiTimeout }
-        ) as Promise<ApiResponse<Record<string, unknown>>>
+        )
       )
     }
     setMessage(`已提交 ${entrustNos.length} 笔撤单请求。请以同步后的当日委托状态为准。`)
@@ -518,7 +516,7 @@ export default function TradingDesk() {
           manual_captcha_timeout: 180,
         },
         { timeout: apiTimeout }
-      ) as Promise<ApiResponse<Record<string, unknown>>>
+      )
     )
     if (data) {
       setMessage('已提交全部撤单请求。请以同步后的当日委托状态为准。')
