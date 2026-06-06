@@ -12,7 +12,7 @@ class Execution(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     strategy_id = Column(String(64), nullable=False, index=True)
     strategy_name = Column(String(100), nullable=False)
-    account_id = Column(Integer, ForeignKey("trading_account.id"), nullable=False)
+    account_id = Column(Integer, nullable=False, comment="账户ID（关联 account_trading.trading_account）")
     status = Column(String(20), nullable=False, default="running")
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=True)
