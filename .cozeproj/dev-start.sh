@@ -1,4 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
+
 # 开发环境启动脚本：同时启动后端 FastAPI 和前端 Vite
 
 # 启动后端 FastAPI（后台）
@@ -7,4 +9,5 @@ nohup python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload > /app/work
 
 # 启动前端 Vite（前台，端口 5000）
 cd /workspace/projects/frontend
-exec npx vite --host 0.0.0.0 --port 5000
+export PORT=5000
+exec pnpm exec vite --host 0.0.0.0 --port 5000
