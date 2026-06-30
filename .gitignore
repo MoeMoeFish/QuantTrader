@@ -89,6 +89,9 @@ logs/
 *.xlsx
 *.csv
 
+# 平台生成文件
+assets/
+.cozeproj/
 # 本地临时/历史输出
 yjx.md
 docs/yang-jingxi-api-contract.html
