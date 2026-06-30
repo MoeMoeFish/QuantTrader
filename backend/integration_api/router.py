@@ -14,6 +14,7 @@ from account_trading.repository import AccountTradingRepository
 from account_trading.router import engine_label
 from account_trading.service import account_trading_service
 from common.dependencies import get_db
+from common.utils.response import ApiResponse
 
 
 router = APIRouter(prefix="/api/integration", tags=["上下游统一接入"])
@@ -21,12 +22,6 @@ router = APIRouter(prefix="/api/integration", tags=["上下游统一接入"])
 OrderSide = Literal["buy", "sell"]
 OrderScope = Literal["today", "history"]
 AccountType = Literal["live", "paper", "backtest"]
-
-
-class ApiResponse(BaseModel):
-    success: bool
-    data: Any = None
-    message: str = ""
 
 
 class AccountIdentity(BaseModel):

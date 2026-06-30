@@ -19,8 +19,6 @@ import type {
   ExecutionLog,
   RiskRule,
   StartExecutionRequest,
-  ApiResponse,
-  PaginatedResponse,
 } from '../types/execution'
 
 type TabKey = 'executions' | 'signals' | 'risk' | 'logs'
@@ -75,14 +73,14 @@ export default function Execution() {
     [busy]
   )
 
-  async function callApi<T>(label: string, work: () => Promise<ApiResponse<T>>) {
+  async function apiCall<T>(label: string, work: () => Promise<T>): Promise<T | null> {
     setBusy(label)
     setError('')
     setMessage('')
     try {
-      const response = await work()
-      setMessage(response.message)
-      return response.data
+      const data = await work()
+      setMessage('')
+      return data
     } catch (err: unknown) {
       const error = err as { response?: { data?: { detail?: { message?: string } } }; message?: string }
       const detail = error?.response?.data?.detail
@@ -95,69 +93,55 @@ export default function Execution() {
 
   async function refreshStatus() {
     try {
-      const response = await request.get<ApiResponse<ExecutionStatus>>('/execution/status', {
-        timeout: apiTimeout,
-      })
-      if (response.success) {
-        setStatus(response.data)
-      }
+      const data = await request.get<any>('/execution/status', { timeout: apiTimeout })
+      if (data) setStatus(data)
     } catch {
       // 使用默认值
     }
   }
 
   async function refreshExecutions() {
-    const data = await callApi<PaginatedResponse<Execution>>('executions', () =>
-      request.get('/execution/list', { timeout: apiTimeout }) as Promise<ApiResponse<PaginatedResponse<Execution>>>
-    )
-    if (data) {
-      setExecutions(data.items || [])
+    try {
+      const data = await request.get<any>('/execution/list', { timeout: apiTimeout })
+      if (data?.items) setExecutions(data.items)
+    } catch {
+      setExecutions([])
     }
   }
 
   async function refreshSignals() {
-    const data = await callApi<ExecutionSignal[]>('signals', () =>
-      request.get('/execution/signals', {
-        params: { limit: 50 },
-        timeout: apiTimeout,
-      }) as Promise<ApiResponse<ExecutionSignal[]>>
-    )
-    if (data) {
-      setSignals(data)
+    try {
+      const data = await request.get<any>('/execution/signals', { timeout: apiTimeout })
+      if (data) setSignals(Array.isArray(data) ? data : [])
+    } catch {
+      setSignals([])
     }
   }
 
   async function refreshAlerts() {
-    const data = await callApi<RiskAlert[]>('alerts', () =>
-      request.get('/execution/risk-alerts/active', { timeout: apiTimeout }) as Promise<ApiResponse<RiskAlert[]>>
-    )
-    if (data) {
-      setAlerts(data)
+    try {
+      const data = await request.get<any>('/execution/risk-alerts/active', { timeout: apiTimeout })
+      if (data) setAlerts(Array.isArray(data) ? data : [])
+    } catch {
+      setAlerts([])
     }
   }
 
   async function refreshLogs() {
     if (selectedExecutionId) {
-      const data = await callApi<PaginatedResponse<ExecutionLog>>('logs', () =>
-        request.get(`/execution/${selectedExecutionId}/logs`, {
-          params: { limit: 50 },
-          timeout: apiTimeout,
-        }) as Promise<ApiResponse<PaginatedResponse<ExecutionLog>>>
-      )
-      if (data) {
-        setLogs(data.items || [])
+      try {
+        const data = await request.get<any>(`/execution/${selectedExecutionId}/logs`, { timeout: apiTimeout })
+        if (data?.items) setLogs(data.items)
+      } catch {
+        setLogs([])
       }
     }
   }
 
   async function refreshStrategies() {
     try {
-      const response = await request.get<ApiResponse<Array<{ id: number; name: string }>>>('/strategy/list', {
-        timeout: apiTimeout,
-      })
-      if (response.success) {
-        setStrategies(response.data || [])
-      }
+      const data = await request.get<any>('/strategy/list', { timeout: apiTimeout })
+      if (data) setStrategies(Array.isArray(data) ? data : [])
     } catch {
       setStrategies([
         { id: 1, name: '双均线策略' },
@@ -169,13 +153,8 @@ export default function Execution() {
 
   async function refreshAccounts() {
     try {
-      const response = await request.get<ApiResponse<Array<{ id: number; account_code: string; account_name: string }>>>(
-        '/account/accounts',
-        { timeout: apiTimeout }
-      )
-      if (response.success) {
-        setAccounts(response.data || [])
-      }
+      const data = await request.get<any>('/account/accounts', { timeout: apiTimeout })
+      if (data) setAccounts(Array.isArray(data) ? data : [])
     } catch {
       setAccounts([
         { id: 1, account_code: 'LIVE_THS_001', account_name: '实盘主账户' },
@@ -186,10 +165,8 @@ export default function Execution() {
 
   async function refreshRiskRules() {
     try {
-      const response = await request.get<ApiResponse<RiskRule[]>>('/execution/risk-rules', { timeout: apiTimeout })
-      if (response.success) {
-        setRiskRules(response.data || [])
-      }
+      const data = await request.get<any>('/execution/risk-rules', { timeout: apiTimeout })
+      if (data) setRiskRules(Array.isArray(data) ? data : [])
     } catch {
       setRiskRules([
         {
@@ -251,46 +228,46 @@ export default function Execution() {
       setError('请选择策略和账户')
       return
     }
-    const data = await callApi<Execution>('start', () =>
-      request.post('/execution/start', startForm, { timeout: apiTimeout }) as Promise<ApiResponse<Execution>>
-    )
-    if (data) {
+    try {
+      await request.post('/execution/start', startForm, { timeout: apiTimeout })
       setShowStartModal(false)
       setStartForm({ strategy_id: 0, account_id: '', params: {} })
       await Promise.all([refreshStatus(), refreshExecutions()])
+    } catch (e) {
+      setError((e as Error).message)
     }
   }
 
   async function stopExecution(id: number) {
-    const data = await callApi<Execution>('stop', () =>
-      request.post(`/execution/${id}/stop`, {}, { timeout: apiTimeout }) as Promise<ApiResponse<Execution>>
-    )
-    if (data) {
+    try {
+      await request.post(`/execution/${id}/stop`, {}, { timeout: apiTimeout })
       await Promise.all([refreshStatus(), refreshExecutions()])
+    } catch {
+      // 忽略错误
     }
   }
 
   async function pauseExecution(id: number) {
-    const data = await callApi<Execution>('pause', () =>
-      request.post(`/execution/${id}/pause`, {}, { timeout: apiTimeout }) as Promise<ApiResponse<Execution>>
-    )
-    if (data) {
+    try {
+      await request.post(`/execution/${id}/pause`, {}, { timeout: apiTimeout })
       await Promise.all([refreshStatus(), refreshExecutions()])
+    } catch {
+      // 忽略错误
     }
   }
 
   async function resumeExecution(id: number) {
-    const data = await callApi<Execution>('resume', () =>
-      request.post(`/execution/${id}/resume`, {}, { timeout: apiTimeout }) as Promise<ApiResponse<Execution>>
-    )
-    if (data) {
+    try {
+      await request.post(`/execution/${id}/resume`, {}, { timeout: apiTimeout })
       await Promise.all([refreshStatus(), refreshExecutions()])
+    } catch {
+      // 忽略错误
     }
   }
 
   async function generateMockSignal(id: number) {
-    const data = await callApi<ExecutionSignal>('signal', () =>
-      request.post(`/execution/${id}/mock-signal`, {}, { timeout: apiTimeout }) as Promise<ApiResponse<ExecutionSignal>>
+    const data = await apiCall<ExecutionSignal>('signal', () =>
+      request.post(`/execution/${id}/mock-signal`, {}, { timeout: apiTimeout })
     )
     if (data) {
       await Promise.all([refreshStatus(), refreshExecutions(), refreshSignals()])
@@ -304,8 +281,8 @@ export default function Execution() {
   }
 
   async function acknowledgeAlert(id: number) {
-    const data = await callApi<RiskAlert>('acknowledge', () =>
-      request.post(`/execution/risk-alerts/${id}/acknowledge`, {}, { timeout: apiTimeout }) as Promise<ApiResponse<RiskAlert>>
+    const data = await apiCall<RiskAlert>('acknowledge', () =>
+      request.post(`/execution/risk-alerts/${id}/acknowledge`, {}, { timeout: apiTimeout })
     )
     if (data) {
       await Promise.all([refreshStatus(), refreshAlerts()])
@@ -313,12 +290,12 @@ export default function Execution() {
   }
 
   async function toggleRiskRule(id: number, enabled: boolean) {
-    const data = await callApi<RiskRule>('toggle', () =>
+    const data = await apiCall<RiskRule>('toggle', () =>
       request.post(
         `/execution/risk-rules/${id}/${enabled ? 'disable' : 'enable'}`,
         {},
         { timeout: apiTimeout }
-      ) as Promise<ApiResponse<RiskRule>>
+      )
     )
     if (data) {
       await refreshRiskRules()

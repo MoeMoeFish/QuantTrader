@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
-import { ArrowLeft, RefreshCw, TrendingUp, TrendingDown } from 'lucide-react'
+import { ArrowLeft, RefreshCw } from 'lucide-react'
 import { AppLayout } from '@/common/components'
 import { formatNumber, formatPercent } from '@/common/utils'
 import {
@@ -12,7 +12,7 @@ import {
 import type { StockBaseInfo, KLineData, RealTimeQuote, StockListItem } from '@/api-data/types'
 
 // 五档盘口类型
-type OrderLevel = { price: number | null; volume: number | null }
+type OrderLevel = { price: number | null | undefined; volume: number | null | undefined }
 
 // 支持的K线周期
 const TIMEFRAMES = ['1m', '5m', '15m', '30m', '1h', '1d', '1w']
@@ -97,8 +97,8 @@ export default function SymbolDetail() {
   ]
 
   // 格式化成交量（手）
-  function formatVolume(vol: number | null) {
-    if (vol === null || vol === 0) return '-'
+  function formatVolume(vol: number | null | undefined) {
+    if (vol === null || vol === undefined || vol === 0) return '-'
     if (vol >= 10000) return `${(vol / 10000).toFixed(2)}万`
     return Math.floor(vol).toString()
   }

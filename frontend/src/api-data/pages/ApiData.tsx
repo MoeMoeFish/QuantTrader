@@ -60,40 +60,6 @@ export default function ApiData() {
     }
   }, [selectedMarket])
 
-  // 搜索股票
-  const searchStocksData = useCallback(async () => {
-    if (!debouncedSearch.trim()) {
-      loadStocks()
-      return
-    }
-
-    setLoading(true)
-    try {
-      console.log('Searching stocks with keyword:', debouncedSearch)
-      const list = await searchStocks({ keyword: debouncedSearch, market: selectedMarket, limit: 100 })
-      console.log('Search results:', list.length)
-      setStocks(list)
-      setIsSearchMode(true)
-
-      // 批量获取实时行情
-      if (list.length > 0) {
-        const symbols = list.slice(0, 20).map(s => s.symbol)
-        try {
-          const quotesData = await getBatchRealtimeQuote({ symbols })
-          const quotesMap: Record<string, RealTimeQuote> = {}
-          quotesData.forEach(q => { quotesMap[q.symbol] = q })
-          setQuotes(quotesMap)
-        } catch (e) {
-          console.error('Failed to load quotes:', e)
-        }
-      }
-    } catch (e) {
-      console.error('Failed to search stocks:', e)
-    } finally {
-      setLoading(false)
-    }
-  }, [debouncedSearch, selectedMarket, loadStocks])
-
   // 清空搜索
   const clearSearch = () => {
     setSearch('')

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
 from common.dependencies import get_db
+from common.utils.response import ApiResponse
 
 from .adapters.ths_desktop import CaptchaRequiredError, TradingClientNotReadyError
 from .repository import AccountTradingRepository, _normalize_order_status
@@ -24,12 +25,6 @@ OrderScope = Literal["today", "history"]
 ManagedAccountType = Literal["live", "paper", "backtest"]
 ManagedAccountStatus = Literal["active", "inactive", "archived"]
 BindingType = Literal["desktop", "ths", "webapi", "mock", "backtest"]
-
-
-class ApiResponse(BaseModel):
-    success: bool
-    data: Any = None
-    message: str = ""
 
 
 class AccountManageRequest(BaseModel):
@@ -420,6 +415,29 @@ async def get_account_snapshot(
         raise_api_error(exc)
 
 
+@router.get("/positions/refresh", response_model=ApiResponse)
+async def refresh_positions_with_realtime(
+    account_id: int = Query(..., gt=0),
+    db: AsyncSession = Depends(get_db),
+):
+    """刷新持仓：调用实时行情更新 last_price 并重新计算浮动盈亏。"""
+    try:
+        repo = AccountTradingRepository(db)
+        account = await get_managed_account(repo, account_id)
+        if account.account_type == "paper":
+            result = await repo.refresh_paper_market_value(account)
+            positions = result.get("positions", [])
+        elif account.account_type == "live":
+            await repo.expire_today_unfilled_orders(account)
+            positions = await repo.list_latest_positions(account)
+        else:
+            await repo.expire_today_unfilled_orders(account)
+            positions = await repo.list_latest_positions(account)
+        return ok(positions, "持仓已刷新，实时行情已更新")
+    except Exception as exc:
+        raise_api_error(exc)
+
+
 @router.get("/balance", response_model=ApiResponse)
 async def get_balance(
     account_id: int | None = Query(default=None, gt=0),
@@ -759,7 +777,18 @@ async def place_order(payload: OrderRequest, db: AsyncSession = Depends(get_db))
 @router.post("/order/{entrust_no}/cancel", response_model=ApiResponse)
 async def cancel_order(entrust_no: str, payload: CancelRequest | None = None, db: AsyncSession = Depends(get_db)):
     payload = payload or CancelRequest()
+    mode = payload.mode or "live"
     try:
+        # ── 模拟盘撤单 ──
+        if mode in ("paper", "backtest"):
+            repo = AccountTradingRepository(db)
+            account = await repo.get_account(payload.account_id)
+            if not account:
+                raise_api_error(ValueError(f"账户 {payload.account_id} 不存在"))
+            result = await repo.cancel_paper_order(account, entrust_no)
+            return ok(result, "模拟盘撤单成功")
+
+        # ── 实盘撤单 ──
         repo, account, _ = await get_account_context(db, payload.account_id, require_live=True)
         client_path = await repo.get_active_client_path(account)
         task = await repo.create_task(

@@ -13,17 +13,28 @@ from pathlib import Path
 from typing import Any, Literal
 
 import pandas as pd
-import pywinauto
-import pywinauto.clipboard
-import pywinauto.keyboard
-import win32clipboard
-import win32con
-import win32gui
-import win32process
-from pywinauto import Application, Desktop
-from pywinauto.application import ProcessNotFoundError
-from pywinauto.findwindows import ElementNotFoundError
-from PIL import Image, ImageEnhance, ImageFilter, ImageGrab
+
+# Windows 专用模块 - Linux 上条件导入
+if sys.platform == "win32":
+    import pywinauto
+    import pywinauto.clipboard
+    import pywinauto.keyboard
+    import win32clipboard
+    import win32con
+    import win32gui
+    import win32process
+    from pywinauto import Application, Desktop
+    from pywinauto.application import ProcessNotFoundError
+    from pywinauto.findwindows import ElementNotFoundError
+    from PIL import Image, ImageEnhance, ImageFilter, ImageGrab
+else:
+    # Linux 占位，避免导入错误
+    pywinauto = None
+    Application = None
+    Desktop = None
+    ProcessNotFoundError = Exception
+    ElementNotFoundError = Exception
+    Image = None
 
 
 OrderSide = Literal["buy", "sell"]

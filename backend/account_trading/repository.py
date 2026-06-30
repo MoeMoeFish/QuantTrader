@@ -289,6 +289,7 @@ class AccountTradingRepository:
         ]
 
     async def refresh_paper_market_value(self, account: TradingAccount) -> dict[str, Any]:
+        """刷新模拟盘持仓市值：调用腾讯实时行情更新 last_price，重新计算市值与浮动盈亏。"""
         if account.account_type != "paper":
             raise ValueError("当前账户不是模拟账户")
         await self.expire_today_unfilled_orders(account)
@@ -307,9 +308,26 @@ class AccountTradingRepository:
             )
             return {"balance": balance, "positions": []}
 
-        refreshed: list[dict[str, Any]] = []
+        # 批量获取实时行情
+        symbols = [row.symbol for row in positions if row.symbol]
+        realtime_quotes: dict[str, Decimal] = {}
+        if symbols:
+            try:
+                from api_data.router import fetch_tencent_quote
+                for symbol in symbols:
+                    try:
+                        quote = fetch_tencent_quote(symbol)
+                        if quote and quote.get("last_price"):
+                            realtime_quotes[symbol] = Decimal(str(quote["last_price"]))
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+        # 用实时行情更新每个持仓的 last_price
         for row in positions:
-            last_price = Decimal(str(row.last_price or row.cost_price or "0"))
+            realtime_price = realtime_quotes.get(row.symbol)
+            last_price = realtime_price if realtime_price else Decimal(str(row.last_price or row.cost_price or "0"))
             await self._upsert_paper_position_snapshot(
                 account,
                 symbol=row.symbol,
@@ -321,8 +339,8 @@ class AccountTradingRepository:
                 last_price=last_price,
                 raw={
                     "event": "paper_market_value_refresh",
-                    "quote": None,
-                    "note": "未接入上游实时行情时沿用本地最新价，避免固定兜底价污染模拟持仓。",
+                    "quote_source": "tencent_realtime" if realtime_price else "local_fallback",
+                    "realtime_price": str(realtime_price) if realtime_price else None,
                 },
             )
         refreshed = await self.list_latest_positions(account)
@@ -932,6 +950,45 @@ class AccountTradingRepository:
                 "raw": result,
             },
         )
+
+    async def cancel_paper_order(self, account: TradingAccount, order_id: str) -> dict[str, Any]:
+        """模拟盘撤单：将 pending 状态的订单改为 cancelled"""
+        if account.account_type != "paper":
+            return {"success": False, "message": "仅模拟盘支持此撤单接口"}
+        # 模拟盘 order_id 是 order_no (PORD-...)，需要按 order_no 查找
+        order_cls = self._order_cls(account)
+        result = await self.db.execute(
+            select(order_cls).where(
+                order_cls.account_id == account.id,
+                order_cls.order_no == order_id,
+            )
+        )
+        order = result.scalar_one_or_none()
+        if order is None:
+            return {"success": False, "message": f"未找到委托 {order_id}"}
+        if order.status not in ("pending", "submitted", "partial_fill"):
+            return {"success": False, "message": f"委托状态为 {order.status}，无法撤单"}
+        from_status = order.status
+        order.status = "cancelled"
+        order.canceled_at = _now()
+        # 归还冻结资金
+        if order.side == "buy" and order.price and order.quantity:
+            frozen = Decimal(str(order.price)) * Decimal(str(order.quantity))
+            balance_row = await self._latest_paper_balance_snapshot(account)
+            if balance_row is not None:
+                balance_row.frozen_cash = (balance_row.frozen_cash or Decimal("0")) - frozen
+                balance_row.available_cash = (balance_row.available_cash or Decimal("0")) + frozen
+        await self._append_order_status_log(
+            account=account,
+            order=order,
+            from_status=from_status,
+            to_status="cancelled",
+            event_type="cancel_request",
+            event_source="paper_engine",
+            detail={"order_id": order_id},
+            message="模拟盘撤单成功",
+        )
+        return {"success": True, "message": "撤单成功", "order_id": order_id, "status": "cancelled"}
 
     async def save_cancel_result(self, account: TradingAccount, entrust_no: str, result: dict[str, Any]) -> None:
         order = await self._find_order(account, entrust_no)

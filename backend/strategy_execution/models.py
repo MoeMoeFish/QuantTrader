@@ -1,17 +1,18 @@
+from datetime import datetime
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from ._db import Base, TimestampMixin
 
 
-class Execution(Base, TimestampMixin):
+class Execution(Base):
     """策略执行实例"""
 
     __tablename__ = "execution"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    strategy_id = Column(Integer, nullable=False, index=True)
+    strategy_id = Column(String(64), nullable=False, index=True)
     strategy_name = Column(String(100), nullable=False)
-    account_id = Column(String(64), nullable=False)
+    account_id = Column(Integer, nullable=False, comment="账户ID（关联 account_trading.trading_account）")
     status = Column(String(20), nullable=False, default="running")
     start_time = Column(DateTime, nullable=False)
     end_time = Column(DateTime, nullable=True)
@@ -26,14 +27,14 @@ class Execution(Base, TimestampMixin):
     logs = relationship("ExecutionLog", back_populates="execution", cascade="all, delete-orphan")
 
 
-class ExecutionSignal(Base, TimestampMixin):
+class ExecutionSignal(Base):
     """交易信号记录"""
 
     __tablename__ = "execution_signal"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     execution_id = Column(Integer, ForeignKey("execution.id"), nullable=False, index=True)
-    strategy_id = Column(Integer, nullable=False, index=True)
+    strategy_id = Column(String(64), nullable=False, index=True)
     symbol = Column(String(20), nullable=False, index=True)
     symbol_name = Column(String(50), nullable=True)
     direction = Column(String(10), nullable=False)
@@ -47,6 +48,8 @@ class ExecutionSignal(Base, TimestampMixin):
     order_status = Column(String(20), nullable=True)
     filled_price = Column(Float, nullable=True)
     filled_quantity = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     pnl = Column(Float, nullable=True)
 
     execution = relationship("Execution", back_populates="signals")

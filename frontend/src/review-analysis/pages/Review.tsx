@@ -4,8 +4,6 @@ import ReactECharts from 'echarts-for-react'
 import { AlertTriangle, BarChart3, CheckCircle2, Loader2, RefreshCcw, Search, Sparkles, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
-type ApiResponse<T> = { success: boolean; data: T; message: string }
-
 type ReviewAccount = {
   id: number
   account_code: string
@@ -150,14 +148,14 @@ export default function Review() {
     void bootstrap()
   }, [])
 
-  async function callApi<T>(label: string, work: () => Promise<ApiResponse<T>>) {
+  async function callApi<T>(label: string, work: () => Promise<T>) {
     setBusy(label)
     setError('')
     setMessage('')
     try {
-      const response = await work()
-      setMessage(response.message)
-      return response.data
+      const data = await work()
+      setMessage('')
+      return data
     } catch (err: any) {
       const detail = err?.response?.data?.detail
       setError(detail?.message || err?.message || '请求失败')
@@ -182,7 +180,7 @@ export default function Review() {
 
   async function loadAccounts() {
     const data = await callApi<ReviewAccount[]>('accounts', () =>
-      request.get('/review/accounts', { timeout: apiTimeout }) as Promise<ApiResponse<ReviewAccount[]>>
+      request.get('/review/accounts', { timeout: apiTimeout })
     )
     if (data) setAccounts(data)
     return data
@@ -190,7 +188,7 @@ export default function Review() {
 
   async function loadSessions() {
     const data = await callApi<ReviewSession[]>('sessions', () =>
-      request.get('/review/sessions', { timeout: apiTimeout }) as Promise<ApiResponse<ReviewSession[]>>
+      request.get('/review/sessions', { timeout: apiTimeout })
     )
     if (data) setSessions(data)
     return data
@@ -202,7 +200,7 @@ export default function Review() {
       request.get('/review/report', {
         params: { session_id: sessionId },
         timeout: apiTimeout,
-      }) as Promise<ApiResponse<ReviewReport>>
+      })
     )
     if (data) {
       setReport(data)
@@ -223,7 +221,7 @@ export default function Review() {
       run_id: form.run_id.trim() || undefined,
     }
     const data = await callApi<ReviewReport>('generate', () =>
-      request.post('/review/sessions/generate', payload, { timeout: apiTimeout }) as Promise<ApiResponse<ReviewReport>>
+      request.post('/review/sessions/generate', payload, { timeout: apiTimeout })
     )
     if (data) {
       setReport(data)
@@ -237,7 +235,7 @@ export default function Review() {
     const confirmed = window.confirm('确认删除当前复盘会话及其指标、曲线、建议吗？')
     if (!confirmed) return
     const data = await callApi<{ deleted: boolean }>('delete', () =>
-      request.delete(`/review/sessions/${selectedSessionId}`, { timeout: apiTimeout }) as Promise<ApiResponse<{ deleted: boolean }>>
+      request.delete(`/review/sessions/${selectedSessionId}`, { timeout: apiTimeout })
     )
     if (data) {
       setReport(null)
