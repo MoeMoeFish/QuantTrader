@@ -3,8 +3,13 @@ import { Suspense } from 'react'
 import {
   HomePage,
   ApiDataPage,
+  ApiDataDebugPage,
+  SimpleDebugPage,
+  TestPage,
   SymbolDetailPage,
-  AccountPage,
+  AccountManagementPage,
+  TradingDeskPage,
+  OrderQueryPage,
   StrategiesPage,
   StrategyEditorPage,
   ExecutionPage,
@@ -27,8 +32,14 @@ export default function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/api-data" element={<ApiDataPage />} />
+          <Route path="/api-data-debug" element={<ApiDataDebugPage />} />
+          <Route path="/simple-debug" element={<SimpleDebugPage />} />
+          <Route path="/test-page" element={<TestPage />} />
           <Route path="/symbol-detail" element={<SymbolDetailPage />} />
-          <Route path="/account" element={<AccountPage />} />
+          <Route path="/account" element={<AccountManagementPage />} />
+          <Route path="/account/manage" element={<AccountManagementPage />} />
+          <Route path="/account/trading" element={<TradingDeskPage />} />
+          <Route path="/account/orders" element={<OrderQueryPage />} />
           <Route path="/strategies" element={<StrategiesPage />} />
           <Route path="/strategy-editor" element={<StrategyEditorPage />} />
           <Route path="/execution" element={<ExecutionPage />} />
